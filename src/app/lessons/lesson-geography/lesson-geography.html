@@ -1,0 +1,91 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 01">
+  <h1>Base geography</h1>
+  <p>Today's map, under everything the story will draw: the Black Sea and its coast, six rivers, and the counties, raions, oblasts and districts of six countries. A Node script turns Natural Earth into one TopoJSON file, and <a routerLink="/">the map</a> draws it inside the frame in ink. Later lessons don't add new outlines for most borders. They merge these units (step 5) and snap traced lines to these rivers (step 7).</p>
+
+  <h2>1. The data</h2>
+  <p>Natural Earth 1:10m (public domain), from the <code>nvkelso/natural-earth-vector</code> repository, pinned to tag <code>v5.1.2</code>: the same input always gives the same output, as in data-viz.</p>
+  <table>
+    <thead><tr><th>File</th><th>Size</th><th>Gives</th></tr></thead>
+    <tbody>
+      <tr><td><code>ne_10m_admin_1_states_provinces</code></td><td>40.7 MB</td><td>Every admin-1 unit in the world. The units of the six countries, the neighbours, and (as their outer edge) the coastline.</td></tr>
+      <tr><td><code>ne_10m_rivers_lake_centerlines</code></td><td>7.3 MB</td><td>The Danube and its delta branches (Chilia, Sulina, Sfântu Gheorghe, and the Borcea above the delta), Prut, Dniester, Olt, Mureș</td></tr>
+      <tr><td><code>ne_10m_rivers_europe</code></td><td>2.5 MB</td><td>Europe's extra rivers. The only file with the Siret.</td></tr>
+      <tr><td><code>ne_10m_geography_marine_polys</code></td><td>1.7 MB</td><td>Named seas: the Black Sea</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><strong>Why 1:10m.</strong> data-viz drew the world at 1:50m. Here the frame spans 10.5° of longitude across a whole screen, about 1 km per pixel. At 1:50m the Olt and the Mureș aren't there at all, and Moldova has no raions.</li>
+    <li><strong>What's in the file.</strong> 147 units (Romania 42, Moldova 40, Serbia 22, Hungary 18, Bulgaria 16, Ukraine 9). Three neighbours, each merged into one shape: Slovakia, Kosovo, Montenegro. Six rivers, and the Black Sea. 16 524 points in 496 arcs, 181 kB (gzipped by the server, about a third of that).</li>
+    <li><strong>Quirks kept as they are.</strong> Natural Earth splits the Moldovan raions that straddle the Dniester, so there are two units named Rezina and two coded <code>MD-SN</code>. That's why the id is Natural Earth's <code>adm1_code</code> (<code>MDA-1645</code>), not the ISO code. Hungary's 23 urban counties are units of their own (Debrecen, Szeged…). Names are Natural Earth's, with uneven diacritics (<code>Dâmbovita</code>, <code>Timis</code>).</li>
+  </ul>
+
+  <h2>2. The pipeline</h2>
+  <pre><code>npm run data:geography            # uses scripts/.cache
+npm run data:geography -- --fresh # downloads again</code></pre>
+  <ol>
+    <li><strong>Download, once.</strong> The four GeoJSON files go to <code>scripts/.cache/</code>, which is gitignored. The output, <code>public/data/geography.topo.json</code>, is committed, so neither the app nor a fresh clone depends on GitHub.</li>
+    <li><strong>Select the region.</strong> A unit is kept if its bounds (<code>geoBounds</code>) touch the frame's box, 20°–30.5° E, 43°–48.5° N. The frame's edges are meridians and parallels, so in [lon, lat] the conic's fan is exactly this box. Units are kept whole, never cut at the edge: Chernivtsi oblast must stay Chernivtsi oblast to become Northern Bukovina in step 5.</li>
+    <li><strong>Build the topology.</strong> <code>topology()</code> from <code>topojson-server</code> finds every border two units share and stores it once, as an arc. Four objects: <code>units</code>, <code>neighbours</code>, <code>rivers</code>, <code>sea</code>.</li>
+    <li><strong>Merge the neighbours.</strong> Slovakia, Kosovo and Montenegro are context, not building blocks: <code>mergeArcs</code> turns their units into one shape each.</li>
+    <li><strong>Simplify, lightly.</strong> Visvalingam (<code>presimplify</code>, <code>simplify</code>), planar, dropping corners smaller than 10<sup>−5</sup> square degrees (about 0.1 px² on screen): 23 412 → 16 524 points. Arc endpoints are always kept, so where three units meet, or a border meets the coast, nothing moves. Unlike data-viz there's no Chaikin smoothing: these lines are snapping targets, so every point left is a real Natural Earth point.</li>
+    <li><strong>Quantize.</strong> A 100 000 × 100 000 grid over the data's box (about 17° × 11°): roughly 15 m, far below a pixel. The source and licence are written into the file as a <code>source</code> member.</li>
+  </ol>
+
+  <h2>3. Why admin units</h2>
+  <ul>
+    <li><strong>Most historical borders of the last two centuries are today's internal borders.</strong> Bessarabia is roughly Moldova plus Ukraine's Budjak. Northern Bukovina is Chernivtsi oblast. Southern Dobruja is Dobrich plus Silistra. The 1859 Union is Romania without Transylvania and Dobruja. Merge the units and the border comes out, with no tracing (step 5).</li>
+    <li><strong>Shared edges, for free.</strong> Units come from one topology, so two states merged from neighbouring units meet along the same arc: no gaps, no slivers, and a crossfade (step 9) changes only what changed.</li>
+    <li><strong>Snapping targets.</strong> The trace tool (step 7) snaps to these arcs and to the rivers, so a traced 1600 border that follows the Milcov or the Prut lands on the same line as everything else.</li>
+    <li><strong>What it isn't.</strong> Today's units only approximate older ones, and admin-1 is coarse:
+      <ul>
+        <li>Chernivtsi oblast also includes the Hotin area, which was Bessarabia, not Bukovina.</li>
+        <li>The Budjak is the south-west of Odessa oblast, not a unit of its own. Natural Earth's admin-1 can't give it, so step 5 needs Ukraine's raions (admin-2) or a traced line.</li>
+      </ul>
+      Those cases get a precision value and a note, not a silent fit.</li>
+  </ul>
+
+  <h2>4. Drawing it</h2>
+  <ul>
+    <li><code>data/geography.ts</code>: an <code>httpResource</code> loads the file once. A <code>computed()</code> turns it into what the map strokes and fills, using <code>mesh()</code>, which visits each arc once with the shapes on either side:
+      <ul>
+        <li>a single shape → coastline (or the data's far edge, outside the frame)</li>
+        <li>two countries → country border</li>
+        <li>the same country → unit border</li>
+      </ul>
+    </li>
+    <li>The page passes it to <code>RegionMap</code> as an input. The map still owns the projection and turns each layer into one path string in <code>computed()</code>. No <code>d3.select</code>, as before.</li>
+    <li><strong>Inside the frame only.</strong> The geography is clipped to the frame (an SVG <code>clipPath</code> with the frame's path), the way an atlas plate stops at its neatline. The graticule still runs out to the window's edge, and shows through the sea but not the land.</li>
+    <li><strong>Paper and ink.</strong>
+      <ul>
+        <li>Land is white like the paper, and the sea gets the faint <code>--tint</code>.</li>
+        <li>Every line is ink, and its weight says what it is: unit borders 0.4 px in <code>--muted</code>, rivers 0.9, the Danube 1.6, the coast 1.</li>
+        <li>Country borders are 1.2 with the atlas dash-dot, so where one follows a river (the Prut, the Danube), both still read.</li>
+        <li>Lines are drawn thinnest first, so a county line never covers a river.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>scripts/build-geography.mjs</code>: the pipeline. <code>package.json</code> gets the <code>data:geography</code> script.</li>
+    <li><code>public/data/geography.topo.json</code>: its output, committed</li>
+    <li><code>.gitignore</code>: <code>/scripts/.cache</code></li>
+    <li><code>src/app/data/geography.ts</code>: loads the file and builds the layers</li>
+    <li><code>src/app/app.config.ts</code>: <code>provideHttpClient(withFetch())</code></li>
+    <li><code>src/app/charts/region-map/*</code>: the clip path, the layers and their styles</li>
+    <li><code>src/app/pages/map/map-page.*</code>: passes the geography to the map</li>
+    <li><code>src/app/lessons/lesson-geography/*</code>, <code>lessons.routes.ts</code>, <code>roadmap/roadmap.html</code>: this page and its place in the list</li>
+    <li>New packages: <code>topojson-client</code>; for the script, <code>topojson-server</code> and <code>topojson-simplify</code>; their types</li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li><code>npm run data:geography</code> runs from the cache and reports 147 units, 3 neighbours, 6 rivers, about 181 kB</li>
+    <li><code>git status</code> doesn't list <code>scripts/.cache</code></li>
+    <li><a routerLink="/">The map</a>: land white, the Black Sea tinted, the geography stopping at the frame, the graticule continuing outside it</li>
+    <li>The six rivers are there, with the Danube's three delta branches and the Siret meeting the Danube near Galați. Moldova's border follows the Prut.</li>
+    <li>Country borders are dash-dot and county lines are hairlines; zoom in on the Prut and the Danube to see a border and a river side by side</li>
+    <li><code>ng build</code> passes. Then commit as <code>lesson 01</code>.</li>
+  </ul>
+</app-lesson-page>

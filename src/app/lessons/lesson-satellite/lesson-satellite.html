@@ -1,0 +1,58 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 02">
+  <h1>Satellite backdrop</h1>
+  <p>The <a routerLink="/">map</a> now sits on a real view of the land: the Carpathian arc in dark forest green, snow on the Făgăraș peaks, the Danube plain, the delta and the Black Sea's depth. The rivers are bold and dark blue. For a children's story it answers "where are the mountains?" before any border is drawn.</p>
+
+  <h2>1. The picture: NASA's Blue Marble</h2>
+  <ul>
+    <li><strong>Blue Marble Next Generation</strong>, July 2004, the "topo + bathy" variant: a cloud-free composite of a month of satellite passes, with relief shading on land and depth shading at sea. Public domain; credited "NASA Earth Observatory".</li>
+    <li>NASA serves it as eight tiles of 21,600 × 21,600 pixels. Romania is in tile C1 (0–90° E, 0–90° N): an 88 MB JPEG, about 460 m a pixel here.</li>
+    <li>The picture is in plain longitude and latitude: x is longitude, y is latitude, evenly spaced (an "equirectangular" image). The map isn't: it's a conic projection (lesson 00). So the picture has to be redrawn in the map's projection before the lines can sit on it.</li>
+  </ul>
+
+  <h2>2. Reprojecting once, at build time</h2>
+  <pre><code>npm run data:satellite   // scripts/build-satellite.mjs → public/data/satellite.webp (229 kB)
+
+for every output pixel (x, y):
+  [lon, lat] = projection.invert([x, y])    // which place this pixel shows
+  colour     = sample(tile, lon, lat)       // bilinear: the four nearest source pixels, weighted</code></pre>
+  <ul>
+    <li>Reprojection goes <strong>backwards</strong>: for each pixel of the new picture, ask the projection which place it shows (<code>invert</code>), then read the source there. Going forwards (moving each source pixel to its new place) would leave holes where the projection stretches.</li>
+    <li><strong>Crop first:</strong> <code>sharp</code> reads only the region (a degree's margin around the frame, 3,000 × 1,800 pixels) out of the 467-million-pixel tile. The whole tile is never decoded into memory. It runs in under 3 seconds.</li>
+    <li><strong>Bilinear sampling</strong> blends the four nearest source pixels, so the new picture has no jagged pixel steps.</li>
+    <li>Saved as WebP at quality 80: 2,000 × 1,465 pixels in 229 kB. The browser downloads that, not 88 MB; the tile stays in <code>scripts/.cache</code>, ignored by git.</li>
+  </ul>
+
+  <h2>3. Lining it up with the lines</h2>
+  <ul>
+    <li>The script fits the projection to the frame's bounding box, 2,000 pixels wide. The app fits the same projection to the window. Same projection, only scaled and moved: so placing the picture over the frame's bounding box, as computed in the app's own projection (<code>path.bounds(frame)</code>), lines it up at any window size.</li>
+    <li>Proof on screen: the coastline and the Danube's line, from Natural Earth, sit exactly on the picture's own coast and river.</li>
+    <li>The picture is clipped to the frame, like the rest of the geography.</li>
+  </ul>
+
+  <h2>4. Lines over a photograph</h2>
+  <ul>
+    <li>Ink and dark blue alone sink into forest green. So each river is drawn twice: a pale white halo, then the blue line on it. The county lines become faint white hairlines, the coast a white line.</li>
+    <li>The sea shows the picture's own blue; the land gets a light white veil (12%), so the history colours that come later stay readable over the photograph.</li>
+    <li>Rivers are now bold and dark blue (<code>--river</code>, 2 px, the Danube 3.2 px): the one colour water gets on the map.</li>
+  </ul>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>scripts/build-satellite.mjs</code>, <code>npm run data:satellite</code>; <code>public/data/satellite.webp</code>, <code>satellite.json</code> (source, credit, licence)</li>
+    <li><code>charts/region-map/*</code>: the picture under the geography, the river halos, the satellite styles; a <code>satellite</code> input</li>
+    <li><code>styles.scss</code>: <code>--river</code></li>
+    <li><code>package.json</code>: <code>sharp</code> (build only)</li>
+    <li><code>ROADMAP.md</code> and the roadmap page: the children's picture-book plan</li>
+    <li><code>lessons/lesson-satellite/*</code> (this page), <code>lessons.routes.ts</code></li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li>The Carpathian arc, the Transylvanian basin and the Danube plain are plain to see</li>
+    <li>The coastline and the Danube delta line up with the picture</li>
+    <li>Rivers are bold dark blue with a pale halo, readable over the forests</li>
+    <li>Resize the window: the picture stays lined up</li>
+    <li>The page downloads <code>satellite.webp</code> (about 230 kB), never the tile</li>
+  </ul>
+</app-lesson-page>

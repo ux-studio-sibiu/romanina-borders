@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "romanian-borders", "runtimeExecutable": "npx", "runtimeArgs": ["ng", "serve", "--port", "4210"], "port": 4210 }
+  ]
+}

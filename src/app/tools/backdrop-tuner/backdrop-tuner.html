@@ -1,0 +1,37 @@
+@let s = backdrop.style();
+@if (isOpen()) {
+  <section class="nsc-backdrop-tuner" aria-label="Backdrop tuner">
+    <header class="titlebar">
+      <b>Backdrop</b>
+      <span class="spacer"></span>
+      <button type="button" (click)="backdrop.reset()" title="Put every value back">Reset</button>
+      <button type="button" class="primary" (click)="copy()" title="Copy the values as JSON">{{ copied() ? 'Copied' : 'Copy' }}</button>
+      <button type="button" class="close" (click)="toggle(false)" title="Close (Shift+T)" aria-label="Close">×</button>
+    </header>
+
+    <div class="body">
+      <div class="group">
+        <h3>Picture</h3>
+        <div class="row"><label (dblclick)="resetOne('brightness')">Brightness</label><input type="range" min="0.3" max="1.7" step="0.01" [value]="s.brightness" (input)="set('brightness', $event)" /><output>{{ s.brightness.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('contrast')">Contrast</label><input type="range" min="0.3" max="1.7" step="0.01" [value]="s.contrast" (input)="set('contrast', $event)" /><output>{{ s.contrast.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('saturation')">Saturation</label><input type="range" min="0" max="2" step="0.01" [value]="s.saturation" (input)="set('saturation', $event)" /><output>{{ s.saturation.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('hue')">Hue</label><input type="range" min="-180" max="180" step="1" [value]="s.hue" (input)="set('hue', $event)" /><output>{{ s.hue }}°</output></div>
+        <div class="row"><label (dblclick)="resetOne('sepia')">Sepia</label><input type="range" min="0" max="1" step="0.01" [value]="s.sepia" (input)="set('sepia', $event)" /><output>{{ s.sepia.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('blur')">Blur</label><input type="range" min="0" max="6" step="0.1" [value]="s.blur" (input)="set('blur', $event)" /><output>{{ s.blur.toFixed(1) }}px</output></div>
+        <div class="row"><label (dblclick)="resetOne('opacity')">Opacity</label><input type="range" min="0" max="1" step="0.01" [value]="s.opacity" (input)="set('opacity', $event)" /><output>{{ s.opacity.toFixed(2) }}</output></div>
+      </div>
+
+      <div class="group">
+        <h3>Over it</h3>
+        <div class="row"><label (dblclick)="resetOne('veil')">Land veil</label><input type="range" min="0" max="0.8" step="0.01" [value]="s.veil" (input)="set('veil', $event)" /><output>{{ s.veil.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('counties')">Counties</label><input type="range" min="0" max="1" step="0.01" [value]="s.counties" (input)="set('counties', $event)" /><output>{{ s.counties.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('halo')">River halo</label><input type="range" min="0" max="1" step="0.01" [value]="s.halo" (input)="set('halo', $event)" /><output>{{ s.halo.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('coast')">Coastline</label><input type="range" min="0" max="1" step="0.01" [value]="s.coast" (input)="set('coast', $event)" /><output>{{ s.coast.toFixed(2) }}</output></div>
+      </div>
+
+      <p class="hint"><kbd>Shift</kbd>+<kbd>T</kbd> hides the panel · double-click a label to reset it</p>
+    </div>
+  </section>
+} @else {
+  <button type="button" class="show-button" (click)="toggle(true)" title="Backdrop tuner (Shift+T)">Tune</button>
+}

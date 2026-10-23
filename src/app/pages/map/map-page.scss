@@ -1,0 +1,15 @@
+@use '../../../styles/paper' as paper;
+
+// Full screen: the map takes the whole viewport, the header and title block float over it
+.nsc-map-page {
+  position: relative; height: 100dvh; overflow: hidden;
+
+  app-region-map { position: absolute; inset: 0; }
+
+  .title-block {
+    position: absolute; left: 16px; bottom: 24px; max-width: calc(100% - 40px); padding: 10px 14px;
+    @include paper.panel(6px);
+  }
+  .title { margin: 0; font-size: 1.1rem; }
+  .projection { margin: 4px 0 0; color: var(--muted); @include paper.mono-label(0.625rem, 0.1em); }
+}

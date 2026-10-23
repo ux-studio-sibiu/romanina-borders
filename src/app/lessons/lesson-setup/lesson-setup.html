@@ -1,0 +1,90 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 00">
+  <h1>Setup and the projection</h1>
+  <p>A fresh Angular app with the two libraries the whole project leans on, the paper-and-ink look from data-viz, and <a routerLink="/">a full-screen map</a> that has a projection but no geography yet: a graticule and a frame. Getting the projection right first means every later layer (rivers, treaty lines, traced Roman forts) lands on the same drawing.</p>
+
+  <h2>1. The command</h2>
+  <pre><code>npx &#64;angular/cli&#64;21 new romanian-borders --directory . --style=scss --routing --ssr=false --zoneless --skip-git --skip-tests --ai-config=none
+npm install d3-geo gsap
+npm install -D &#64;types/d3-geo &#64;types/geojson prettier</code></pre>
+  <table>
+    <thead><tr><th>Choice</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>&#64;21</code></td><td>Same stack as data-viz. Angular 22 needs Node 22.22+, this machine has Node 20.</td></tr>
+      <tr><td><code>--ssr=false</code></td><td>The map measures the window before it draws, and the story is driven by scrolling. Nothing worth rendering on a server.</td></tr>
+      <tr><td><code>--zoneless</code></td><td>The default since 21. A template updates only when a signal it reads changes. Here that matters at once: the map's size comes from a <code>ResizeObserver</code> callback, so it has to be a signal (section 4).</td></tr>
+      <tr><td><code>--skip-git</code></td><td>You own the git workflow: <code>git init</code> and commit this lesson yourself.</td></tr>
+      <tr><td><code>d3-geo</code></td><td>Projections, graticules and <code>geoPath</code>: [lon, lat] in, SVG path strings out. Only the module, not all of D3.</td></tr>
+      <tr><td><code>gsap</code></td><td>Installed now, used from step 9: crossfading border states, then ScrollTrigger for the story (as in data-viz lesson 17). Nothing imports it yet, so it adds nothing to the bundle.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. Styles, copied in</h2>
+  <ul>
+    <li><code>src/styles.scss</code>: the tokens (<code>--ink</code>, <code>--line</code>, <code>--accent</code>, …) and base typography, copied from data-viz's <code>styles.scss</code>.</li>
+    <li><code>src/styles/_paper.scss</code>: the mixins (<code>panel</code>, <code>field</code>, <code>mono-label</code>, <code>tooltip-card</code>, <code>segmented</code>), copied from data-viz. A copy, never a <code>../data-viz</code> path: this folder must build and serve on its own, and the copy is free to drift.</li>
+    <li><code>LessonPage</code> (this page's layout) is copied too, without the lesson-window rules.</li>
+    <li>The map uses the same language: hairlines every degree, a heavier line every five, a 2px ink frame, monospace labels, and red only for markup (the cross at the centre).</li>
+  </ul>
+
+  <h2>3. The projection: Lambert conformal conic</h2>
+  <pre><code>geoConicConformal()
+  .parallels([44, 48])  // true scale along these two
+  .rotate([-25, 0])     // 25° E becomes the central meridian: it stands upright
+  .fitExtent([[56, 56], [w - 56, h - 56]], frame)</code></pre>
+  <ul>
+    <li><strong>Why a conic.</strong> A cone touching the globe along mid-latitudes is the classic choice for a region wider than it is tall, at 40°–50° N. Meridians become straight lines that lean together towards the north, parallels become arcs. That's the shape of every European atlas plate the trace tool will georeference later.</li>
+    <li><strong>Why these parallels.</strong> Romania runs from 43.6° N (Zimnicea, on the Danube) to 48.3° N (Maramureș, Bukovina). 44° and 48° sit just inside each end (the usual rule of thumb is a sixth of the span in, 44.4° and 47.5°, rounded here to whole degrees), so the scale error is shared across the country instead of piling up at one edge.</li>
+    <li><strong>Why conformal.</strong> A conformal map keeps angles, so small shapes keep theirs: the Carpathian arc bends the way it does on the ground, and river courses that later borders snap to aren't sheared. Over a region this small the area error is tiny anyway (table below), so comparing the size of Bessarabia and Transylvania stays fair.</li>
+    <li><strong>The alternative.</strong> <code>geoConicEqualArea</code> with the same parameters would look the same at this scale, trading the tiny area error for a tiny shape error. Romania's national grid, Stereo 70, is an oblique stereographic centred on the same point, 25° E 46° N, and would also do. Mercator would not: see the last column.</li>
+  </ul>
+  <table>
+    <thead><tr><th>Latitude</th><th>Where</th><th>Area error, this map</th><th>Mercator (vs 44° N)</th></tr></thead>
+    <tbody>
+      <tr><td>42° N</td><td>Balkan range</td><td>+0.36%</td><td>−6.3%</td></tr>
+      <tr><td>44° N</td><td>Dobruja, the Danube</td><td>0 (standard parallel)</td><td>0</td></tr>
+      <tr><td>46° N</td><td>Transylvania, the centre</td><td>−0.12%</td><td>+7.2%</td></tr>
+      <tr><td>48° N</td><td>Maramureș, Bukovina</td><td>0 (standard parallel)</td><td>+15.6%</td></tr>
+      <tr><td>50° N</td><td>Galicia</td><td>+0.38%</td><td>+25.2%</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Measured with d3-geo: the projected length of a tiny step along the meridian at 25° E, squared, relative to the same at 44° N. On Mercator, a territory in Bukovina (48° N) would look almost a quarter bigger than one of the same area in Bulgaria (42° N): 1.156 / 0.937.</p>
+
+  <h2>4. Full screen: fit, not a fixed viewBox</h2>
+  <ul>
+    <li>data-viz's flat map draws into a fixed 960 × 500 <code>viewBox</code> and lets the SVG scale. That letterboxes a full-screen map. Here a <code>ResizeObserver</code> on the host writes its size into a signal, and the projection is a <code>computed()</code> that refits to it. Resize the window and the frame stays fully in view, as big as it fits.</li>
+    <li><code>fitExtent</code> fits the <strong>frame</strong>: <code>geoGraticule().extent([[20, 43], [30.5, 48.5]]).outline()</code>, the polygon between two meridians and two parallels. It covers every state the story will show, from the Tisza plain to the Dniester's mouth, the Balkan range to Galicia. Drawn, it is the map's neatline: a fan, not a rectangle.</li>
+    <li>The graticule runs well beyond the frame (5°–45° E, 33°–60° N), so it reaches the window's edges on any screen shape. d3 resamples the lines adaptively, so the parallels come out as smooth arcs, not polylines.</li>
+    <li>The projection is set up once per size, the path strings come from <code>geoPath</code> in <code>computed()</code>, and the template only binds <code>[attr.d]</code>. No <code>d3.select</code>: D3 does the math, Angular does the DOM, as in data-viz.</li>
+  </ul>
+
+  <h2>5. Folders</h2>
+  <table>
+    <thead><tr><th>Folder</th><th>Holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>pages/</code></td><td>The product's routed pages. Today: <code>map</code>, full screen.</td></tr>
+      <tr><td><code>charts/</code></td><td>D3-powered SVG components. Today: <code>region-map</code>, the projection and its graticule.</td></tr>
+      <tr><td><code>lessons/</code></td><td>One folder per lesson page, the roadmap and <code>lessons.routes.ts</code> (a lazy subtree)</td></tr>
+      <tr><td><code>styles/</code> (in <code>src/</code>)</td><td>The copied paper-and-ink mixins</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Coming in their own steps: <code>scripts/</code> (data builds, step 2), <code>data/</code> (models and stores), and the dev-only trace route (step 6).</p>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>src/app/app.config.ts</code>, <code>app.routes.ts</code>, <code>app.ts</code>, <code>app.html</code>, <code>app.scss</code>: shell and routing</li>
+    <li><code>src/app/charts/region-map/*</code>: the projection, graticule and frame</li>
+    <li><code>src/app/pages/map/*</code>: the full-screen page and its title block</li>
+    <li><code>src/app/lessons/*</code>: the roadmap, this page, the copied <code>LessonPage</code></li>
+    <li><code>src/styles.scss</code>, <code>src/styles/_paper.scss</code>, <code>.prettierrc</code>: copied from data-viz</li>
+    <li>Everything else is <code>ng new</code> output, unchanged</li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li><code>npm start</code> → <a routerLink="/">the map</a>: a fan-shaped frame, meridians straight and converging northwards, parallels curved, the red cross at 25° E 46° N</li>
+    <li>Resize the window: the frame refits and stays fully in view</li>
+    <li><code>ng build</code> passes; this page and the roadmap load as their own chunks</li>
+    <li>Then <code>git init</code> and commit as <code>lesson 00</code></li>
+  </ul>
+</app-lesson-page>

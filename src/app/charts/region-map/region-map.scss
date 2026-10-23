@@ -1,0 +1,51 @@
+@use '../../../styles/paper' as paper;
+
+// The host is sized by the parent (here: the whole map page); the figure and SVG fill it
+:host { display: block; }
+
+.nsc-region-map {
+  width: 100%; height: 100%; margin: 0;
+
+  svg { display: block; width: 100%; height: 100%; }
+  path { fill: none; }
+
+  // Hairlines every degree, a heavier line every five: a drawing's construction lines, then its grid
+  .graticule { stroke: var(--line); stroke-width: 0.5; }
+  .graticule.major { stroke: var(--muted); stroke-width: 0.75; }
+  .frame { stroke: var(--ink); stroke-width: 2; stroke-linejoin: miter; }
+
+  // Lesson 01: land white like the paper, the sea a faint tint, every line in ink. Weight says what a line is:
+  // county hairlines, rivers bold and dark blue (the one colour water gets), the Danube heavier still. Country borders get the atlas dash-dot, so where one
+  // runs along a river (the Prut, the Danube) the two still read apart.
+  .geography path { stroke-linejoin: round; stroke-linecap: round; }
+  .sea { fill: var(--tint); }
+  .land { fill: var(--surface); }
+  .unit-borders { stroke: var(--muted); stroke-width: 0.4; }
+  .river-halo { stroke: none; }
+  .river { stroke: var(--river); stroke-width: 2; }
+  .river.is-main { stroke-width: 3.2; }
+  .country-borders { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 7 2.5 1.5 2.5; stroke-linecap: butt; }
+  .coastline { stroke: var(--ink); stroke-width: 1; }
+
+  // Lesson 02: over the satellite picture. The sea shows the picture's own blue (its depth shading), the land gets a light
+  // white veil so the history colours that come later stay readable, and the lines get pale halos: ink and dark blue alone
+  // would sink into the forest green. The numbers come from the backdrop tuner (backdrop-style.ts), as custom properties.
+  .has-satellite {
+    .satellite { opacity: var(--satellite-opacity); filter: var(--satellite-filter); }
+    .sea { fill: none; }
+    .land { fill: rgb(255 255 255 / var(--land-veil)); }
+    .unit-borders { stroke: rgb(255 255 255 / var(--county-lines)); stroke-width: 0.5; }
+    .river-halo { stroke: rgb(255 255 255 / var(--river-halo)); stroke-width: 4; }
+    .river-halo.is-main { stroke-width: 5.6; }
+    .country-borders { stroke: var(--ink); stroke-width: 1.6; }
+    .coastline { stroke: rgb(255 255 255 / var(--coast-line)); }
+  }
+
+  text { @include paper.mono-label(0.625rem, 0.1em); fill: var(--muted); }
+  .meridian { text-anchor: middle; dominant-baseline: hanging; transform: translateY(10px); }
+  .parallel { text-anchor: end; dominant-baseline: middle; transform: translateX(-10px); }
+
+  // The one red: markup, not geography
+  .centre path { stroke: var(--accent); stroke-width: 1.5; }
+  .centre text { fill: var(--accent); }
+}

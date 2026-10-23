@@ -1,0 +1,40 @@
+<figure class="nsc-region-map">
+  <!-- Nothing to draw until the ResizeObserver has measured the host -->
+  @if (size().width) {
+    <svg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()">
+      <defs><clipPath [attr.id]="clipId"><path [attr.d]="frame()" /></clipPath></defs>
+
+      <path class="graticule" [attr.d]="minor()" />
+      <path class="graticule major" [attr.d]="major()" />
+
+      <!-- Lesson 01: the geography, inside the frame only. Fills first, then lines from thinnest to heaviest, so a river
+           or a country border is never hidden under a county line. The graticule shows through the sea, not the land. -->
+      <g class="geography" [class.has-satellite]="satellite()" [attr.clip-path]="'url(#' + clipId + ')'">
+        <!-- Lesson 02: the satellite picture first, under everything. preserveAspectRatio none: its box is the frame's
+             bounding box, already the picture's own shape. -->
+        @if (satellite()) {
+          @let s = satelliteBox();
+          <image class="satellite" href="data/satellite.webp" [attr.x]="s.x" [attr.y]="s.y" [attr.width]="s.width" [attr.height]="s.height" preserveAspectRatio="none" />
+        }
+        <path class="sea" [attr.d]="sea()" />
+        <path class="land" [attr.d]="land()" />
+        <path class="unit-borders" [attr.d]="unitBorders()" />
+        <!-- Each river twice: a pale halo, then the blue line on it, so it stays readable over dark forest -->
+        @for (r of rivers(); track r.id) { <path class="river-halo" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
+        @for (r of rivers(); track r.id) { <path class="river" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
+        <path class="country-borders" [attr.d]="countryBorders()" />
+        <path class="coastline" [attr.d]="coastline()" />
+      </g>
+
+      <path class="frame" [attr.d]="frame()" />
+
+      @for (t of meridians(); track t.text) { <text class="tick meridian" [attr.x]="t.x" [attr.y]="t.y">{{ t.text }}</text> }
+      @for (t of parallels(); track t.text) { <text class="tick parallel" [attr.x]="t.x" [attr.y]="t.y">{{ t.text }}</text> }
+
+      <g class="centre" [attr.transform]="'translate(' + centre()[0] + ' ' + centre()[1] + ')'">
+        <path d="M-8 0H8M0 -8V8" />
+        <text x="10" y="-8">25° E 46° N</text>
+      </g>
+    </svg>
+  }
+</figure>

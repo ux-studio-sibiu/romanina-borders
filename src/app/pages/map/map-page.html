@@ -1,0 +1,13 @@
+<section class="nsc-map-page">
+  <!-- 64px kept clear under the frame for the title block -->
+  <app-region-map [reserveBottom]="64" [geography]="geography.base()" />
+
+  <!-- A dev tool for the satellite backdrop's look (Shift+T) -->
+  <app-backdrop-tuner />
+
+  <!-- The title block, as on a drawing sheet: what this is and how it is projected -->
+  <aside class="title-block">
+    <h1 class="title">Romania's borders</h1>
+    <p class="projection">Lambert conformal conic · parallels 44° and 48° N · central meridian 25° E</p>
+  </aside>
+</section>
