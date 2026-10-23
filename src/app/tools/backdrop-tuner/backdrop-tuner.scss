@@ -1,6 +1,6 @@
 @use '../../../styles/studio' as studio;
 
-// The randomize-studio panel look (styles/_studio.scss), top left
+// The randomize-studio panel look (styles/_studio.scss), top right under the header links: the timeline has the top left
 @include studio.buttons;
-.nsc-backdrop-tuner { top: 20px; left: 20px; @include studio.panel; }
-.show-button { top: 20px; left: 20px; @include studio.show-tab; }
+.nsc-backdrop-tuner { top: 52px; right: 20px; @include studio.panel; }
+.show-button { top: 52px; right: 20px; @include studio.show-tab; }

@@ -1,0 +1,33 @@
+{
+  "//": "The map's geometry, in one place: read by the app (charts/region-map) and by the build scripts (scripts/build-geography.mjs, build-satellite.mjs), so they always agree. core: the story's lands, always fully on screen. area: the core and about a fifth more on every side, the data's extent and what a full-bleed window shows. projection: Lambert conformal conic. All in [lon, lat] degrees.",
+  "core": [
+    [
+      20,
+      43
+    ],
+    [
+      30.5,
+      48.5
+    ]
+  ],
+  "area": [
+    [
+      16.5,
+      41.2
+    ],
+    [
+      34,
+      50.2
+    ]
+  ],
+  "projection": {
+    "parallels": [
+      44,
+      48
+    ],
+    "rotate": [
+      -25,
+      0
+    ]
+  }
+}
