@@ -64,13 +64,17 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "8kB",
+                  "maximumError": "12kB"
                 }
               ],
               "outputHashing": "all"
             },
             "development": {
+              "assets": [
+                { "glob": "**/*", "input": "public" },
+                { "glob": "*.jpg", "input": "reference-maps", "output": "reference-maps" }
+              ],
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true

@@ -1,0 +1,62 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 04">
+  <h1>A simple trace tool</h1>
+  <p>The old borders have no data to download: they have to be drawn. The <a routerLink="/trace">trace tool</a> lays a public-domain map over ours, lines the two up by eye, then lets you click round a region. The points are kept as longitude and latitude, smoothed into friendly rounded outlines, and exported as a file to commit. (Lesson 03, the moments, comes after: the tool first, so the shapes can be drawn while the story is written.)</p>
+
+  <h2>1. Lining up an old map</h2>
+  <ul>
+    <li>The four reference maps (<code>reference-maps/</code>, see its <code>SOURCES.md</code>) are scans of atlases from 1865–1911, each in its own projection. Ours is a Lambert conic. They will never match exactly, and for rough, child-sized shapes they don't need to.</li>
+    <li>So the alignment is the simplest that works: <strong>move</strong> (drag), <strong>size</strong> (scroll, about the cursor, so the place under it stays put), <strong>stretch</strong> (taller or wider) and <strong>rotate</strong>. Line up the Danube, the coast and the Carpathian bend, the things that haven't moved in 2,000 years, and the borders follow.</li>
+    <li>The alignment is kept in <em>frame widths</em>, not pixels: the picture's centre, from the frame's corner, and its width, as fractions of the frame's width. Resize the window and the picture stays lined up, because the frame is refitted the same way (lesson 02's trick).</li>
+    <li>Opacity, and the Multiply blend, let the old map's lines show through over the satellite picture.</li>
+  </ul>
+
+  <h2>2. Points in degrees, not pixels</h2>
+  <pre><code>click (x, y)  →  projection.invert([x, y])  →  [lon, lat]   // stored
+[lon, lat]    →  projection([lon, lat])      →  (x, y)       // drawn, at any size</code></pre>
+  <ul>
+    <li>A shape is its <strong>control points</strong>, the ones you clicked, in [lon, lat] (4 decimals, about 10 m). Everything else is computed from them, so dragging a point redraws the outline.</li>
+    <li>Click to add points; click the first point (or Enter) to close the shape. On a closed shape a click puts a point into the nearest edge, and a right-click removes one.</li>
+    <li>Kept in localStorage while you work, so a reload loses nothing.</li>
+  </ul>
+
+  <h2>3. Smoothing: a curve through the clicks</h2>
+  <ul>
+    <li>A handful of clicks would make a jagged polygon. Smoothing draws a <strong>Catmull-Rom spline</strong> through them: a curve that passes through every point, bending gently between them. A B-spline would be smoother still but misses the points, so a border wouldn't go where you put it.</li>
+    <li>The <strong>centripetal</strong> kind: the curve's speed between two points depends on the square root of their distance, which stops it looping or overshooting where two clicks are close together.</li>
+    <li>It is computed in our projection at a fixed size, not in raw degrees: at 46° N a degree of longitude is only 0.7 times as long as a degree of latitude, and smoothing in degrees would squash the curves sideways. Eight points are sampled between each pair of clicks.</li>
+    <li>Smooth can be turned off per shape, for the straight edges of a modern border.</li>
+  </ul>
+
+  <h2>4. The file: GeoJSON</h2>
+  <ul>
+    <li>Export writes <code>shapes.geo.json</code>, a GeoJSON FeatureCollection: the smoothed outline as each feature's polygon (3 decimals, about 100 m), so the player and any GIS tool can read it directly, and the control points in its properties, so Import can bring a shape back to edit.</li>
+    <li>One trap: d3-geo works on the sphere, where a ring's <em>direction</em> says which side is inside. Drawn the other way round, a polygon is the whole world except the shape. The tool checks the area (<code>geoArea</code>) and turns any ring bigger than a hemisphere round.</li>
+    <li>Each shape remembers which reference map it was traced from, for the credits.</li>
+  </ul>
+
+  <h2>5. A dev tool</h2>
+  <ul>
+    <li>The reference maps are served by <code>ng serve</code> only (the development configuration's <code>assets</code> in <code>angular.json</code>), so they never ship. Open… loads any other image from your disk.</li>
+    <li>The Trace link shows only in development (<code>isDevMode()</code>).</li>
+    <li>The panel shares the randomize-studio look with the backdrop tuner: <code>styles/_studio.scss</code>.</li>
+  </ul>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>pages/trace/*</code>: the page, its overlay and panel; <code>tools/trace/trace-shapes.ts</code>: shapes, alignment, smoothing, the file</li>
+    <li><code>charts/region-map/region-map.ts</code>: the projection and frame box made public, <code>frame</code> and <code>regionProjection</code> exported</li>
+    <li><code>styles/_studio.scss</code>, shared by <code>tools/backdrop-tuner/*</code></li>
+    <li><code>angular.json</code>: the reference maps in development; the component style budget (8 kB, for the studio chrome)</li>
+    <li><code>app.routes.ts</code>, <code>app.html</code>: the <code>/trace</code> route and link; <code>lessons/lesson-trace/*</code> (this page)</li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li>Pick the Spruner map, Align: drag and scroll until the Danube and the coast match; resize the window, it stays matched</li>
+    <li>Draw round Roman Dacia: the outline is rounded, passes through every click, and closes on the first point</li>
+    <li>Drag a point, add one on an edge, right-click one away; reload: everything is still there</li>
+    <li>Export, delete the shape, Import: it comes back, editable</li>
+    <li>The exported polygon fills the region, not the rest of the world</li>
+  </ul>
+</app-lesson-page>

@@ -37,7 +37,7 @@ simple, roughly traced shapes, not a research atlas.
    1600 Michael the Brave · 1775 and 1812 Bukovina and Bessarabia taken · 1859 Cuza and the Union · 1877–78
    independence and the sea · 1918 the Great Union · 1940 lands lost in the war · today (1989 freedom, 2007 the EU).
 
-4. **A simple trace tool.** A dev-only page: drop in a public-domain map image, drag, scale and fade it until it roughly
+4. **A simple trace tool** ✓ (built before 3). A dev-only page: drop in a public-domain map image, drag, scale and fade it until it roughly
    lines up with the backdrop, then click around a region to draw a shape. Shapes are smoothed automatically into
    friendly rounded outlines, named, and exported as JSON to commit.
 

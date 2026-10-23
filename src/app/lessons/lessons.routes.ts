@@ -5,5 +5,6 @@ export const lessonRoutes: Routes = [
   { path: '', loadComponent: () => import('./roadmap/roadmap').then(m => m.Roadmap), title: 'Roadmap' },
   { path: 'setup', loadComponent: () => import('./lesson-setup/lesson-setup').then(m => m.LessonSetup), title: '00 Setup and the projection' },
   { path: 'geography', loadComponent: () => import('./lesson-geography/lesson-geography').then(m => m.LessonGeography), title: '01 Base geography' },
-  { path: 'satellite', loadComponent: () => import('./lesson-satellite/lesson-satellite').then(m => m.LessonSatellite), title: '02 Satellite backdrop' }
+  { path: 'satellite', loadComponent: () => import('./lesson-satellite/lesson-satellite').then(m => m.LessonSatellite), title: '02 Satellite backdrop' },
+  { path: 'trace', loadComponent: () => import('./lesson-trace/lesson-trace').then(m => m.LessonTrace), title: '04 A simple trace tool' }
 ];

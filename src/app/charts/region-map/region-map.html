@@ -13,7 +13,7 @@
         <!-- Lesson 02: the satellite picture first, under everything. preserveAspectRatio none: its box is the frame's
              bounding box, already the picture's own shape. -->
         @if (satellite()) {
-          @let s = satelliteBox();
+          @let s = frameBox();
           <image class="satellite" href="data/satellite.webp" [attr.x]="s.x" [attr.y]="s.y" [attr.width]="s.width" [attr.height]="s.height" preserveAspectRatio="none" />
         }
         <path class="sea" [attr.d]="sea()" />

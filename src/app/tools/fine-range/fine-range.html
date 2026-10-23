@@ -1,0 +1,5 @@
+<input type="range" [min]="min()" [max]="max()" [step]="step()" [value]="value()" (input)="set($any($event.target).value)" [attr.aria-label]="label()" />
+<button type="button" class="nudge" (pointerdown)="start(-1, $event)" (pointerup)="stop()" (pointerleave)="stop()" [attr.aria-label]="'Less ' + label()">−</button>
+<input type="number" class="field" [step]="fine()" [value]="value().toFixed(digits())"
+       (change)="set($any($event.target).value)" (keydown)="onKey($event)" (wheel)="onWheel($event)" [attr.aria-label]="label()" />
+<button type="button" class="nudge" (pointerdown)="start(1, $event)" (pointerup)="stop()" (pointerleave)="stop()" [attr.aria-label]="'More ' + label()">+</button>

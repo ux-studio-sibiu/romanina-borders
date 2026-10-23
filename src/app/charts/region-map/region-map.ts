@@ -14,7 +14,10 @@ const PAD = 56; // room around the frame for the degree labels
 // it isn't a rectangle: the meridians are straight and lean together towards the north, the parallels are arcs.
 // precision(0.25): a vertex every quarter degree along the parallels. d3 joins vertices with great-circle arcs, not
 // parallels, so at the default 2.5° the frame's top and bottom edges would show kinks.
-const frame = geoGraticule().extent(REGION).precision(0.25).outline();
+export const frame = geoGraticule().extent(REGION).precision(0.25).outline();
+// The map's projection, before it is fitted to a size. Exported: the trace tool smooths its shapes in it (lesson 04).
+export const regionProjection = () => geoConicConformal().parallels([44, 48]).rotate([-25, 0]);
+
 const minor = geoGraticule().extent(BEYOND).step([1, 1]).precision(0.5)();
 const major = geoGraticule().extent(BEYOND).step([5, 5]).precision(0.5)();
 
@@ -61,9 +64,10 @@ export class RegionMap {
   // Lambert conformal conic: true scale along 44° and 48° N (they bracket Romania, 43.6°–48.3° N), centred on 25° E so
   // that meridian stands upright. Conformal: angles and small shapes are kept, so the Carpathian arc bends as it should.
   // Between 42° and 50° N areas are off by under 0.4% (lesson 00), so territories can still be compared by size.
-  private readonly projection = computed(() => {
+  // Public: the trace tool (lesson 04) draws over the map in the same projection
+  readonly projection = computed(() => {
     const { width, height } = this.size();
-    return geoConicConformal().parallels([44, 48]).rotate([-25, 0]).fitExtent([[PAD, PAD], [width - PAD, height - PAD - this.reserveBottom()]], frame);
+    return regionProjection().fitExtent([[PAD, PAD], [width - PAD, height - PAD - this.reserveBottom()]], frame);
   });
   private readonly path = computed(() => geoPath(this.projection()));
 
@@ -71,10 +75,10 @@ export class RegionMap {
   protected readonly major = computed(() => this.path()(major) ?? '');
   protected readonly frame = computed(() => this.path()(frame) ?? '');
 
-  // Lesson 02: where the satellite picture goes. scripts/build-satellite.mjs drew it in this same projection, fitted to the
+  // Lesson 02: where the satellite picture goes, and lesson 04's unit for placing a reference map (public). scripts/build-satellite.mjs drew it in this same projection, fitted to the
   // frame's bounding box; here the projection is only scaled and moved to fit the window, so placing the picture over the
   // frame's bounding box lines it up exactly, at any size.
-  protected readonly satelliteBox = computed(() => {
+  readonly frameBox = computed(() => {
     const [[x0, y0], [x1, y1]] = this.path().bounds(frame);
     return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
   });
