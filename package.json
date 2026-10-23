@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "data:geography": "node scripts/build-geography.mjs",
-    "data:satellite": "node scripts/build-satellite.mjs"
+    "data:satellite": "node scripts/build-satellite.mjs",
+    "data:shapes": "node scripts/build-shapes.mjs"
   },
   "private": true,
   "packageManager": "npm@11.6.0",

@@ -26,6 +26,7 @@
         <div class="row"><label (dblclick)="resetOne('veil')">Land veil</label><input type="range" min="0" max="0.8" step="0.01" [value]="s.veil" (input)="set('veil', $event)" /><output>{{ s.veil.toFixed(2) }}</output></div>
         <div class="row"><label (dblclick)="resetOne('counties')">Counties</label><input type="range" min="0" max="1" step="0.01" [value]="s.counties" (input)="set('counties', $event)" /><output>{{ s.counties.toFixed(2) }}</output></div>
         <div class="row"><label (dblclick)="resetOne('halo')">River halo</label><input type="range" min="0" max="1" step="0.01" [value]="s.halo" (input)="set('halo', $event)" /><output>{{ s.halo.toFixed(2) }}</output></div>
+        <div class="row"><label (dblclick)="resetOne('outside')">Outside</label><input type="range" min="0" max="0.9" step="0.01" [value]="s.outside" (input)="set('outside', $event)" /><output>{{ s.outside.toFixed(2) }}</output></div>
         <div class="row"><label (dblclick)="resetOne('coast')">Coastline</label><input type="range" min="0" max="1" step="0.01" [value]="s.coast" (input)="set('coast', $event)" /><output>{{ s.coast.toFixed(2) }}</output></div>
       </div>
 

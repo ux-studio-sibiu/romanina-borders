@@ -2,15 +2,25 @@
   <!-- Nothing to draw until the ResizeObserver has measured the host -->
   @if (size().width) {
     <svg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()">
-      <defs><clipPath [attr.id]="clipId"><path [attr.d]="frame()" /></clipPath></defs>
+      <defs>
+        <clipPath [attr.id]="clipId"><path [attr.d]="frame()" /></clipPath>
+        <!-- Lesson 05: each empire's hatch: a tint of its colour and a light diagonal line every 7px, light so it shows over
+             the dark satellite picture -->
+        @for (e of empires(); track e.id) {
+          <pattern [attr.id]="e.pattern" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+            <rect width="7" height="7" [attr.fill]="e.colour" fill-opacity="0.3" />
+            <line x1="3.5" y1="0" x2="3.5" y2="7" [attr.stroke]="e.light" stroke-width="1.8" stroke-opacity="0.9" />
+          </pattern>
+        }
+      </defs>
 
       <path class="graticule" [attr.d]="minor()" />
       <path class="graticule major" [attr.d]="major()" />
 
-      <!-- Lesson 01: the geography, inside the frame only. Fills first, then lines from thinnest to heaviest, so a river
+      <!-- Lesson 01: the geography, inside the map's area only (full bleed: its edges are usually off screen). Fills first, then lines from thinnest to heaviest, so a river
            or a country border is never hidden under a county line. The graticule shows through the sea, not the land. -->
       <g class="geography" [class.has-satellite]="satellite()" [attr.clip-path]="'url(#' + clipId + ')'">
-        <!-- Lesson 02: the satellite picture first, under everything. preserveAspectRatio none: its box is the frame's
+        <!-- Lesson 02: the satellite picture first, under everything. preserveAspectRatio none: its box is the area's
              bounding box, already the picture's own shape. -->
         @if (satellite()) {
           @let s = frameBox();
@@ -18,23 +28,36 @@
         }
         <path class="sea" [attr.d]="sea()" />
         <path class="land" [attr.d]="land()" />
+        @for (e of empires(); track e.id) { <path class="empire" [attr.d]="e.d" [style.fill]="'url(#' + e.pattern + ')'" /> }
+        @for (t of fills(); track t.id) { <path class="territory" [attr.d]="t.d" [style.--territory]="t.colour" /> }
         <path class="unit-borders" [attr.d]="unitBorders()" />
         <!-- Each river twice: a pale halo, then the blue line on it, so it stays readable over dark forest -->
         @for (r of rivers(); track r.id) { <path class="river-halo" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
         @for (r of rivers(); track r.id) { <path class="river" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
         <path class="country-borders" [attr.d]="countryBorders()" />
         <path class="coastline" [attr.d]="coastline()" />
+        <!-- Lesson 05: everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
+             and every name stay above it -->
+        @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" /> }
+        <!-- A border drawn twice: a wide white line, then the black one on it, so it reads over any colour -->
+        @for (e of empires(); track e.id) { <path class="empire-outline-halo" [attr.d]="e.d" /> }
+        @for (e of empires(); track e.id) { <path class="empire-outline" [attr.d]="e.d" [style.stroke]="e.colour" /> }
+        @for (t of outlines(); track t.id) { <path class="territory-outline-halo" [attr.d]="t.d" /> }
+        @for (t of outlines(); track t.id) { <path class="territory-outline" [attr.d]="t.d" [style.--territory]="t.colour" /> }
       </g>
 
-      <path class="frame" [attr.d]="frame()" />
 
-      @for (t of meridians(); track t.text) { <text class="tick meridian" [attr.x]="t.x" [attr.y]="t.y">{{ t.text }}</text> }
-      @for (t of parallels(); track t.text) { <text class="tick parallel" [attr.x]="t.x" [attr.y]="t.y">{{ t.text }}</text> }
-
-      <g class="centre" [attr.transform]="'translate(' + centre()[0] + ' ' + centre()[1] + ')'">
-        <path d="M-8 0H8M0 -8V8" />
-        <text x="10" y="-8">25° E 46° N</text>
-      </g>
+      <!-- Lesson 05: the territories' names, over every line (outside the clip: a name near the area's edge isn't cut) -->
+      @for (e of empires(); track e.id) {
+        <text class="empire-label" [attr.x]="e.x" [attr.y]="e.y" [style.fill]="e.ink">
+          @for (line of e.lines; track $index) { <tspan [attr.x]="e.x" [attr.dy]="$index ? '1.2em' : (e.lines.length > 1 ? '-0.6em' : '0')">{{ line }}</tspan> }
+        </text>
+      }
+      @for (l of labels(); track l.id) {
+        <text class="territory-label" [attr.x]="l.x" [attr.y]="l.y" [style.font-size.px]="l.size" [style.fill]="l.colour">
+          @for (line of l.lines; track $index) { <tspan [attr.x]="l.x" [attr.dy]="$index ? '1.05em' : (l.lines.length > 1 ? '-0.1em' : '0.35em')">{{ line }}</tspan> }
+        </text>
+      }
     </svg>
   }
 </figure>

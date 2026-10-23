@@ -1,0 +1,81 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 05">
+  <h1>The map shapes</h1>
+  <p>The story has thirteen moments, few enough for a child to follow: close events share one (Wallachia's and Moldavia's beginnings; Mircea, Vlad and Stephen). Almost every moment's shape can be <strong>built</strong> rather than drawn, out of today's counties and districts, from Roman Dacia to Romania today, and so can the <strong>empires</strong> round them. Only the Dacians' lands have nothing modern to build from; they are <strong>traced</strong> by hand in the <a routerLink="/trace">trace tool</a>. The timeline below marks where each moment stands.</p>
+
+  <!-- The preview: the map at the chosen moment, full bleed, with its timeline and caption (charts/moments-map) -->
+  <section class="preview"><app-moments-map /></section>
+
+  <h2>1. Provinces from today's counties</h2>
+  <ul>
+    <li>A modern border mostly follows a province's edge, and today's counties mostly sit inside one old province. So a province is built as a <strong>block</strong>: the counties that are mostly in it, merged into one shape. Twelve blocks cover the moments from 1400: Wallachia, Moldavia, southern and northern Bukovina, Dobruja, Southern Dobruja (the Cadrilater), northern and southern Transylvania (with Crișana and Maramureș), Arad, the Banat, Bessarabia and the Budjak.</li>
+    <li>Two more are shown whole, for moments no group of those fits: <strong>Roman Dacia</strong> (Oltenia, the Banat and the Carpathian arc's inside, up to the forts on the eastern Carpathians and Porolissum in the north) and <strong>Bogdan's Moldavia</strong> of 1359 (the northern core: Suceava, Botoșani, Neamț and Chernivtsi). They overlap the provinces, which is fine: every block is its own merge, and a block can take units from several countries.</li>
+    <li>Transylvania and Bukovina are split only because some moments have one half and not the other. A moment with both shows them joined, as one province: each state carries the list it shows (<code>provinces</code>).</li>
+    <li>Merging is TopoJSON's <code>merge</code>: the counties share their borders as arcs (lesson 01), so the arcs inside a block are simply dropped and only its outline is left. No geometry library, no slivers.</li>
+  </ul>
+
+  <h2>2. A moment's lands</h2>
+  <ul>
+    <li>A moment's <strong>state</strong> is a list of blocks merged into one outline: Roman Dacia (101–271); Transylvania with the Banat, Crișana and Maramureș in the Kingdom of Hungary (c. 1000); 1600, the three lands under Michael the Brave without their Ottoman edges (Dobruja, the Banat and Arad, the Budjak); 1859, Wallachia and Moldavia united; 1878 adds Dobruja; 1918 Transylvania, Bukovina and Bessarabia; 1940 loses Bessarabia, northern Bukovina, northern Transylvania and the Cadrilater; today is 1918 without Bessarabia, northern Bukovina and the Cadrilater. (1913, with the Cadrilater, is in the data too, though no moment of its own shows it.)</li>
+    <li>A moment with several countries side by side also has <strong>lands</strong>, each with its own outline: 1330–1359, Wallachia and the first Moldavia; 1400–1504, Wallachia, Moldavia from the mountains to the Dniester and the sea, and Transylvania in the Kingdom of Hungary; 1775–1812, Wallachia and what was left of Moldavia.</li>
+  </ul>
+
+  <h2>3. Empires round the provinces</h2>
+  <ul>
+    <li>A province inside an empire (Transylvania in Hungary, Bessarabia in Russia) or between empires (Wallachia between Hungary and the Ottomans) reads better with the empire drawn round it. Eight are built like the provinces, from provinces and today's units, as far as the map's area shows them: the Roman Empire (with Pannonia, Noricum, Greece and Italy's heel), the Kingdom of Hungary (with Croatia), the Ottoman Empire in the Balkans, and again in 1600 with the Banat, the middle of Hungary and the Budjak, the Habsburg Empire (with Austria, Slovenia, Croatia, Czechia and southern Poland), the Russian Empire (Ukraine east of Galicia, Crimea included), and in 1940 the Soviet Union and Hungary.</li>
+    <li>The neighbour countries are units too, one shape each (lesson 01). A Hungarian county always takes its county-rank city with it: Natural Earth has the cities as units of their own, and one left out would be a hole.</li>
+    <li>They are a different layer from the countries: hatched in their colour instead of filled, a thin dashed edge on a white backing, and their name in spaced capitals, placed by hand (<code>at</code>) in their own land outside the provinces and kept inside the window. One colour per empire at every moment (Ottoman green, Habsburg gold, Russian grey-blue), so a child starts to know them. The provinces' fills sit on top, so the hatch shows through: this land, inside that empire.</li>
+    <li>Everything outside the moment's land, the neighbours, their borders and the empires' hatching, sits under a pale paper veil (the backdrop tuner's Outside slider), so the story's land stands out.</li>
+  </ul>
+
+  <h2>4. Cutting, closing, simplifying</h2>
+  <ul>
+    <li><strong>The Budjak.</strong> Bessarabia's southern end is now in Ukraine's Odessa region, which Natural Earth has as one unit, Budjak and Odessa city together. The script cuts it with a hand-placed polygon whose east edge runs down the Dniester estuary (Sutherland–Hodgman clipping, 20 lines). The piece keeps the region's own points along the Moldovan border, so it still merges cleanly. The Budjak block is that piece plus Moldova's three steppe districts (Taraclia, Comrat, Basarabeasca), so 1600 can leave the whole steppe out. Check: Bessarabia with the Budjak comes out at 44,321 km² (historically 44,422); Greater Romania at 296,686 km² with its lagoons (about 295,000).</li>
+    <li><strong>Lagoons.</strong> The coastline runs round Lake Razim, Golovița and Sinoe as if they were sea, so the outline traced every shore. The script closes the notch with a straight line along the barrier beach (<code>NOTCHES</code>).</li>
+    <li><strong>Simpler lines.</strong> Islets, spits and lagoon holes under about 175 km² are dropped, then small wiggles smoothed (Visvalingam), on the one topology all the shapes share, so a border moves the same way in every shape that has it. The <code>smooth-borders</code> skill (<code>.claude/skills/</code>) has the rules and the numbers to tune.</li>
+  </ul>
+
+  <h2>5. Where it is rough</h2>
+  <p>The timeline marks these as <strong>adjust</strong>: built, but with a stretch of edge to trace or move.</p>
+  <ul>
+    <li><strong>101–271, Roman Dacia:</strong> its eastern edge east of the Olt (the Limes Transalutanus, a line of forts) is a county line. Trace the forts' line over map 1 and cut the shape with it, as the Budjak is cut.</li>
+    <li><strong>1330–1359, Moldavia:</strong> whole counties; early Moldavia's southern and eastern edges want checking against a map of c. 1360.</li>
+    <li><strong>1859, Moldavia:</strong> drawn without Suceava county (Bukovina, Austrian from 1775), which also takes a little of old Moldavia; and without the three southern Bessarabian counties Moldavia held from 1856 to 1878.</li>
+    <li><strong>1940, northern Transylvania:</strong> the line given to Hungary cut through Bihor, Cluj and Mureș counties; here they go to the north whole, so the north is about 51,000 km² instead of 43,500, and the 1940 shape is a little too small.</li>
+    <li>Also simplified, but not worth a mark: in 1600 Tighina (Ottoman from 1538) stays in, the Budjak's northern edge is a county line, and Ottoman Hungary is whole counties.</li>
+    <li>For a picture book this is the right trade: the shapes are recognisable and in the right place, and a child sees what changed. If a line matters more later, it can be traced over the built shape.</li>
+  </ul>
+
+  <h2>6. What is left to trace, and what isn't a shape</h2>
+  <ul>
+    <li><strong>Trace:</strong> the Dacians and Burebista's kingdom (c. 60 BC), over map 1 (Spruner 1865). It wants a feathered edge in the player: nobody knows those borders to the kilometre, and a soft edge says so. In the <a routerLink="/trace">trace tool</a>: pick the reference map, align it, draw, and Export; save the file as <code>public/data/shapes-traced.geo.json</code>, and the player will read it next to <code>shapes.topo.json</code>.</li>
+    <li><strong>Arrows:</strong> 271–1000, the Romans leaving and the peoples passing through, has no borders at all: the player draws movement across a neutral map (lesson 06).</li>
+  </ul>
+
+  <h2>7. The timeline, on this page and the map's</h2>
+  <ul>
+    <li><code>data/shape-timeline.ts</code> lists the moments: each one's year, title, state, empires and status. Lesson 03 can grow it into the story's text.</li>
+    <li>The map, the timeline and the caption are one component, <code>charts/moments-map</code>, used here and on <a routerLink="/">the map page</a>. Here it shows the working notes (each moment's status bar, the key, the note on what to adjust); the map page leaves them out (<code>[details]="false"</code>) and shows only the story.</li>
+    <li>In development it checks, once the file has loaded, that every state and empire the timeline names, and every province it colours, is in <code>shapes.topo.json</code>: a typo would otherwise quietly show nothing. Anything missing is listed in the console.</li>
+  </ul>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>scripts/build-shapes.mjs</code>, <code>npm run data:shapes</code> → <code>public/data/shapes.topo.json</code> (34 kB: blocks, states, lands and empires sharing arcs)</li>
+    <li><code>data/shapes.ts</code>: loads it; <code>data/shape-timeline.ts</code>: the moments</li>
+    <li><code>charts/moments-map/*</code>: the map at a moment, its timeline and caption</li>
+    <li><code>charts/region-map/*</code>: a <code>territories</code> input (fills under the lines, outlines over them, empires hatched with a dashed edge, names), and a <code>focus</code> input for the veil outside it</li>
+    <li><code>.claude/skills/smooth-borders/SKILL.md</code>: how the shapes are simplified</li>
+    <li><code>lessons/lesson-shapes/*</code> (this page), <code>lessons.routes.ts</code></li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li>Step through the timeline: the shape grows in 1878 and 1918, shrinks in 1940, and today matches the modern border; the trace and arrows moments show a tag instead of a shape</li>
+    <li>101–271: Roman Dacia inside the Roman Empire; 1330–1359: Wallachia and a small Moldavia in the north</li>
+    <li>1400–1504: three outlined countries, Transylvania inside the hatched Kingdom of Hungary, the Ottomans south of the Danube; 1600: one, without the Banat, Arad, the Budjak and Dobruja</li>
+    <li>1775–1812: the Habsburg, Russian and Ottoman empires round Wallachia and Moldavia; everything outside them veiled</li>
+    <li>1918: Bessarabia stops at the Dniester and runs down to the Danube mouths and the sea; the outline runs straight past Lake Razim</li>
+    <li>No gaps or slivers between provinces; <a routerLink="/">the map page</a> shows the same timeline without the status bars and notes</li>
+  </ul>
+</app-lesson-page>

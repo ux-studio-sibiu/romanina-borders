@@ -12,7 +12,6 @@
   // Hairlines every degree, a heavier line every five: a drawing's construction lines, then its grid
   .graticule { stroke: var(--line); stroke-width: 0.5; }
   .graticule.major { stroke: var(--muted); stroke-width: 0.75; }
-  .frame { stroke: var(--ink); stroke-width: 2; stroke-linejoin: miter; }
 
   // Lesson 01: land white like the paper, the sea a faint tint, every line in ink. Weight says what a line is:
   // county hairlines, rivers bold and dark blue (the one colour water gets), the Danube heavier still. Country borders get the atlas dash-dot, so where one
@@ -26,6 +25,13 @@
   .river.is-main { stroke-width: 3.2; }
   .country-borders { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 7 2.5 1.5 2.5; stroke-linecap: butt; }
   .coastline { stroke: var(--ink); stroke-width: 1; }
+
+  // Lesson 05: territories. A translucent fill so the land shows through; an outline in ink unless it says otherwise.
+  .territory { fill: var(--territory, var(--accent)); fill-opacity: 0.55; }
+  // The state border: a bold continuous black line on a white backing, so it reads over any colour
+  .territory-outline, .territory-outline-halo { stroke-linecap: round; stroke-linejoin: round; }
+  .territory-outline { stroke: var(--territory, var(--ink)); stroke-width: 3.5; }
+  .territory-outline-halo { stroke: #fff; stroke-width: 7.5; }
 
   // Lesson 02: over the satellite picture. The sea shows the picture's own blue (its depth shading), the land gets a light
   // white veil so the history colours that come later stay readable, and the lines get pale halos: ink and dark blue alone
@@ -42,10 +48,24 @@
   }
 
   text { @include paper.mono-label(0.625rem, 0.1em); fill: var(--muted); }
-  .meridian { text-anchor: middle; dominant-baseline: hanging; transform: translateY(10px); }
-  .parallel { text-anchor: end; dominant-baseline: middle; transform: translateX(-10px); }
 
-  // The one red: markup, not geography
-  .centre path { stroke: var(--accent); stroke-width: 1.5; }
-  .centre text { fill: var(--accent); }
+  // Lesson 05: the veil outside the focus, the paper's colour (the tuner sets how strong)
+  .outside { fill: rgb(246 244 239 / var(--outside-veil, 0.55)); }
+
+  // Lesson 05: an empire, a different layer from the countries: hatched (its pattern, set in the template), a thin dashed
+  // edge in its colour, and its name in spaced capitals
+  .empire-outline, .empire-outline-halo { stroke-linejoin: round; }
+  .empire-outline { stroke-width: 2; stroke-dasharray: 7 4; }
+  .empire-outline-halo { stroke: rgb(255 255 255 / 0.8); stroke-width: 4; }
+  .empire-label {
+    font-family: var(--story-font); font-size: 15px; letter-spacing: 0.28em; text-transform: uppercase; text-anchor: middle;
+    dominant-baseline: middle; stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke; pointer-events: none;
+  }
+
+  // Lesson 05: a province's name in the storybook face, in its own colour (darkened), on a white halo
+  .territory-label {
+    font-family: var(--story-font); letter-spacing: 0.02em; text-transform: none; text-anchor: middle;
+    fill: var(--ink); stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke;
+    pointer-events: none;
+  }
 }

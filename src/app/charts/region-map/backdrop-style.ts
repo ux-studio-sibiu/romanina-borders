@@ -16,11 +16,12 @@ export interface BackdropStyle {
   counties: number;    // the white county hairlines
   halo: number;        // the pale halo under each river
   coast: number;       // the white coastline
+  outside: number;     // the paper veil over everything outside the moment's land (lesson 05)
 }
 
 export const BACKDROP_DEFAULTS: BackdropStyle = {
   brightness: 1, contrast: 1, saturation: 1, hue: 0, sepia: 0, blur: 0, opacity: 0.95,
-  veil: 0.12, counties: 0.45, halo: 0.75, coast: 0.7
+  veil: 0.12, counties: 0.45, halo: 0.75, coast: 0.7, outside: 0.55
 };
 
 const KEY = 'romanianBorders.backdropStyle';

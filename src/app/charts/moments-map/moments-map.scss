@@ -1,0 +1,56 @@
+@use '../../../styles/paper' as paper;
+
+// Fills the parent: the map behind, the two panels floating over it
+:host { position: absolute; inset: 0; display: block; }
+
+.nsc-moments-map {
+  position: relative; width: 100%; height: 100%;
+
+  app-region-map { position: absolute; inset: 0; }
+}
+
+// The two panels: paper, an ink edge, the hatched lift; above the map, out of its way in the corners
+.controls, .caption { position: absolute; left: 16px; z-index: 1; padding: 10px 12px; @include paper.panel(6px); }
+.controls { top: 16px; max-width: min(560px, calc(100% - 32px)); }
+.caption { bottom: 16px; max-width: min(520px, calc(100% - 32px)); }
+
+// A shape's status, one colour each: on the timeline's bars, the key, the moment's tag and the map's placeholder
+[data-status] { --status: var(--muted); }
+[data-status='built'] { --status: #2f7d32; }
+[data-status='adjust'] { --status: #e08a00; }
+[data-status='trace'] { --status: var(--accent); }
+[data-status='arrows'] { --status: #6b6862; }
+
+// The moments in order, wrapping onto more rows; each a year with its status as a bar along the bottom
+.timeline {
+  display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none;
+
+  button {
+    height: 30px; padding: 0 8px; border: 2px solid var(--ink); border-radius: 0;
+    background: var(--surface); color: var(--fg); cursor: pointer; font: inherit; @include paper.mono-label(0.625rem, 0.06em); font-weight: 700;
+  }
+  button[data-status] { border-bottom: 5px solid var(--status); } // the status bar, with the working notes only
+  button:hover { background: var(--tint); }
+  button.is-active { background: var(--ink); color: var(--surface); }
+}
+
+.key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 0.8rem; color: var(--muted); }
+.key li { display: flex; align-items: center; gap: 6px; }
+.bar { width: 18px; height: 5px; background: var(--status); }
+
+// No shape yet: a tag in the middle of the map
+.no-shape {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: 8px 14px;
+  border: 2px solid var(--status); background: var(--surface); color: var(--status);
+  @include paper.mono-label(0.75rem, 0.12em); font-weight: 700;
+}
+
+.state-name { margin: 0; font-weight: 700; }
+.status { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--status); color: var(--status); @include paper.mono-label(0.625rem, 0.08em); font-weight: 700; vertical-align: 2px; }
+.note { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 0.9rem; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.swatch { width: 14px; height: 14px; border: 1px solid var(--ink); }
+// An empire's swatch: its hatch, as on the map
+.swatch.hatch { border: 1.5px dashed var(--empire); background: repeating-linear-gradient(45deg, var(--empire) 0 1.5px, transparent 1.5px 5px); }
