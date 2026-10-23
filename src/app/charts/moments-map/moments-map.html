@@ -24,7 +24,12 @@
   @let m = moment();
   <div class="caption" aria-live="polite">
     <p class="state-name">{{ m.label }}: {{ m.title }} @if (details()) { <span class="status" [attr.data-status]="m.status">{{ statusText[m.status] }}</span> }</p>
-    @if (details() && m.note) { <p class="note">{{ m.note }}</p> }
+    @if (details()) {
+      @if (m.note) { <p class="note">{{ m.note }}</p> }
+    } @else {
+      <p class="ago">{{ yearsAgo(m.year) }}</p>
+      <p class="story">{{ m.text }}</p>
+    }
     @if (state() || empires().length) {
       <ul class="legend">
         @for (b of blocks(); track b.id) { <li><span class="swatch" [style.background]="colour(b.id)"></span>{{ b.properties.name }}</li> }

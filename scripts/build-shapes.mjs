@@ -93,9 +93,11 @@ const LANDS = [
 
 // The empires and kingdoms round (or over) the provinces, as far as the map's area shows them: built like everything else,
 // from provinces (`blocks`) and today's units (`units`, by country, as in BLOCKS; a neighbour country is one unit). `at` is
-// where the name goes, in [lon, lat], in the empire's own land outside the provinces. A unit may come from a block and a
-// list at once; it is counted once. A Hungarian county takes its county-rank city with it (Pest and Budapest, Baranya and
-// Pécs…): Natural Earth has the cities as units of their own, and one left out would be a hole.
+// where the name goes, in [lon, lat]: in the empire's own land, as close to the moment's lands as it fits (inside a
+// province the empire held, like the Habsburgs' Transylvania, where the moment doesn't show it), so it reads beside them.
+// A unit may come from a block and a list at once; it is counted once. A Hungarian county takes its county-rank city
+// with it (Pest and Budapest, Baranya and Pécs…): Natural Earth has the cities as units of their own, and one left out
+// would be a hole.
 const VOJVODINA = ['Severno-Banatski', 'Srednje-Banatski', 'Južno-Banatski', 'Severno-Backi', 'Zapadno-Backi', 'Južno-Backi', 'Sremski'];
 const not = names => names.map(n => '!' + n);
 const SERBIA_SOUTH = ['SRB', ...not(VOJVODINA)];
@@ -109,26 +111,26 @@ const BALKANS = [['BGR'], ['KOS'], ['MNE'], ['MKD'], ['ALB'], ['BIH'], ['GRC'], 
 const EMPIRES = [
   // Rome after Trajan: Roman Dacia, and everything south of the Danube (Moesia, Dalmatia, Thrace, Greece, Italy) with
   // Dobruja, and Pannonia and Noricum west of it; not the plains north of it in Serbia and Hungary (the Sarmatians' land)
-  { id: 'roman-empire', name: 'Roman Empire', at: [24.8, 42.6], blocks: ['roman-dacia', 'dobruja'], units: [...BALKANS, ['HRV'], ['SVN'], ['AUT'], ['ITA'], ['SRB', ...not(VOJVODINA.slice(0, 6))], ['HUN', ...TRANSDANUBIA, 'Budapest']] },
+  { id: 'roman-empire', name: 'Roman Empire', at: [26.4, 43.5], blocks: ['roman-dacia', 'dobruja'], units: [...BALKANS, ['HRV'], ['SVN'], ['AUT'], ['ITA'], ['SRB', ...not(VOJVODINA.slice(0, 6))], ['HUN', ...TRANSDANUBIA, 'Budapest']] },
   // The Kingdom of Hungary, c. 1000–1526: Transylvania, the Banat and Crișana, today's Hungary, Vojvodina, Slovakia,
   // Transcarpathia, and Croatia under its crown
-  { id: 'hungary', name: 'Kingdom of Hungary', at: [19.7, 47.15], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['HRV'], ['UKR', 'Transcarpathia']] },
+  { id: 'hungary', name: 'Kingdom of Hungary', at: [21.2, 47.2], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['HRV'], ['UKR', 'Transcarpathia']] },
   // The Ottomans in the Balkans, from about 1400 to the 1800s: Bulgaria, Serbia south of the Danube, Bosnia, the lands to
   // the south, and Dobruja
-  { id: 'ottoman', name: 'Ottoman Empire', at: [25.6, 42.6], blocks: ['dobruja'], units: [...BALKANS, SERBIA_SOUTH] },
+  { id: 'ottoman', name: 'Ottoman Empire', at: [26.8, 43.5], blocks: ['dobruja'], units: [...BALKANS, SERBIA_SOUTH] },
   // The Ottomans in 1600: also the Banat and Arad, Vojvodina, the middle of Hungary and the Budjak
-  { id: 'ottoman-1600', name: 'Ottoman Empire', at: [25.6, 42.6], blocks: ['dobruja', 'banat', 'arad', 'budjak'], units: [...BALKANS, ['SRB'], ['HUN', ...OTTOMAN_HUNGARY]] },
+  { id: 'ottoman-1600', name: 'Ottoman Empire', at: [26.8, 43.5], blocks: ['dobruja', 'banat', 'arad', 'budjak'], units: [...BALKANS, ['SRB'], ['HUN', ...OTTOMAN_HUNGARY]] },
   // The Habsburg Empire (Austria-Hungary from 1867), 1775–1918: Transylvania, the Banat, Bukovina, Galicia, Hungary,
   // Vojvodina, Austria, Slovenia, Croatia, Slovakia, Bohemia and Moravia (Czechia) and southern Poland (Galicia's west), which is all the
   // area shows of Poland
-  { id: 'habsburg', name: 'Habsburg Empire', at: [19.4, 47.5], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat', 'bukovina-south', 'bukovina-north'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['CZE'], ['AUT'], ['SVN'], ['HRV'], ['POL'], ['UKR', ...UKRAINE_WEST]] },
+  { id: 'habsburg', name: 'Habsburg Empire', at: [24.3, 46.7], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat', 'bukovina-south', 'bukovina-north'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['CZE'], ['AUT'], ['SVN'], ['HRV'], ['POL'], ['UKR', ...UKRAINE_WEST]] },
   // The Russian Empire, 1812–1917: Bessarabia with the Budjak (all of today's Moldova and the Odessa region), and
   // Ukraine east of Galicia, Crimea included
-  { id: 'russian-empire', name: 'Russian Empire', at: [31.2, 48.1], units: [['MDA'], ['UKR', ...not(UKRAINE_WEST)]] },
+  { id: 'russian-empire', name: 'Russian Empire', at: [29.0, 47.2], units: [['MDA'], ['UKR', ...not(UKRAINE_WEST)]] },
   // 1940: the Soviet Union took Bessarabia and northern Bukovina (Galicia it had taken from Poland in 1939); Hungary took
   // northern Transylvania (Transcarpathia in 1939)
-  { id: 'soviet-union', name: 'Soviet Union', at: [31.2, 48.1], units: [['MDA'], ['UKR', '!Transcarpathia']] },
-  { id: 'hungary-1940', name: 'Hungary', at: [19.7, 47.15], blocks: ['transylvania-north'], units: [['HUN'], ['UKR', 'Transcarpathia']] }
+  { id: 'soviet-union', name: 'Soviet Union', at: [28.8, 47.2], units: [['MDA'], ['UKR', '!Transcarpathia']] },
+  { id: 'hungary-1940', name: 'Hungary', at: [23.8, 47.35], blocks: ['transylvania-north'], units: [['HUN'], ['UKR', 'Transcarpathia']] }
 ];
 
 // Provinces split only for the moments that need it (Transylvania by the 1940 line, Bukovina by the 1775–1918 one): where

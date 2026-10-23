@@ -54,15 +54,15 @@
 
   <h2>7. The timeline, on this page and the map's</h2>
   <ul>
-    <li><code>data/shape-timeline.ts</code> lists the moments: each one's year, title, state, empires and status. Lesson 03 can grow it into the story's text.</li>
-    <li>The map, the timeline and the caption are one component, <code>charts/moments-map</code>, used here and on <a routerLink="/">the map page</a>. Here it shows the working notes (each moment's status bar, the key, the note on what to adjust); the map page leaves them out (<code>[details]="false"</code>) and shows only the story.</li>
+    <li><code>data/moments.ts</code> lists the moments: each one's year, title, state, empires and status, and (lesson 03) the story's words.</li>
+    <li>The map, the timeline and the caption are one component, <code>charts/moments-map</code>, used here and on <a routerLink="/">the map page</a>. Here it shows the working notes (each moment's status bar, the key, the note on what to adjust); the map page leaves them out (<code>[details]="false"</code>) and tells each moment's story instead (lesson 03).</li>
     <li>In development it checks, once the file has loaded, that every state and empire the timeline names, and every province it colours, is in <code>shapes.topo.json</code>: a typo would otherwise quietly show nothing. Anything missing is listed in the console.</li>
   </ul>
 
   <h2>Files in this lesson</h2>
   <ul class="note">
     <li><code>scripts/build-shapes.mjs</code>, <code>npm run data:shapes</code> → <code>public/data/shapes.topo.json</code> (34 kB: blocks, states, lands and empires sharing arcs)</li>
-    <li><code>data/shapes.ts</code>: loads it; <code>data/shape-timeline.ts</code>: the moments</li>
+    <li><code>data/shapes.ts</code>: loads it; <code>data/moments.ts</code>: the moments</li>
     <li><code>charts/moments-map/*</code>: the map at a moment, its timeline and caption</li>
     <li><code>charts/region-map/*</code>: a <code>territories</code> input (fills under the lines, outlines over them, empires hatched with a dashed edge, names), and a <code>focus</code> input for the veil outside it</li>
     <li><code>.claude/skills/smooth-borders/SKILL.md</code>: how the shapes are simplified</li>

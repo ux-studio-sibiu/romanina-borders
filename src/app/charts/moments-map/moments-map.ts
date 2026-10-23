@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, input, isDevMode, signal } from '@angular/core';
 import { RegionMap, type Territory } from '../region-map/region-map';
 import { Geography } from '../../data/geography';
-import { SHAPE_TIMELINE, type ShapeStatus } from '../../data/shape-timeline';
+import { MOMENTS, type ShapeStatus, yearsAgo } from '../../data/moments';
 import { Shapes } from '../../data/shapes';
 
 // A colour per province, so a state's pieces read apart (warm for the old principalities, cool for the lands that joined)
@@ -28,7 +28,8 @@ const STATUS_TEXT: Record<ShapeStatus, string> = {
 // Lesson 05: the map at a moment of the story, full bleed, with the timeline floating over its top and the moment's
 // caption over its bottom. Fills its parent (which must be positioned and sized). Used by the map page and lesson 05;
 // whatever is put inside it (a title) goes at the top of the timeline's panel. `details`: the shapes' working notes
-// (each moment's status, the key, the notes on what to trace or adjust), for lesson 05; the map page leaves them out.
+// (each moment's status, the key, the notes on what to trace or adjust), for lesson 05; without them (the map page) the
+// caption tells the moment's story instead, for children (lesson 03).
 @Component({
   selector: 'app-moments-map',
   imports: [RegionMap],
@@ -41,11 +42,12 @@ export class MomentsMap {
   protected readonly geography = inject(Geography);
   protected readonly shapes = inject(Shapes);
   // The timeline: every moment of the story, the shape it shows and how far that shape has got
-  protected readonly timeline = SHAPE_TIMELINE;
+  protected readonly timeline = MOMENTS;
+  protected readonly yearsAgo = yearsAgo;
   protected readonly statusText = STATUS_TEXT;
   protected readonly statuses = Object.keys(STATUS_TEXT) as ShapeStatus[];
   protected readonly momentId = signal('great-union');
-  protected readonly moment = computed(() => SHAPE_TIMELINE.find(m => m.id === this.momentId())!);
+  protected readonly moment = computed(() => MOMENTS.find(m => m.id === this.momentId())!);
 
   protected readonly state = computed(() => this.shapes.states().find(s => s.id === this.moment().state));
   // The provinces to show: the state's blocks, with Transylvania's or Bukovina's halves joined where it has both
@@ -62,7 +64,7 @@ export class MomentsMap {
       if (!states.length) return;
       const has = (list: { id: string }[], id: string) => list.some(f => f.id === id);
       const missing = [
-        ...SHAPE_TIMELINE.flatMap(m => [...(m.state && !has(states, m.state) ? [`state ${m.state} (${m.id})`] : []), ...(m.empires ?? []).filter(e => !has(empires, e)).map(e => `empire ${e} (${m.id})`)]),
+        ...MOMENTS.flatMap(m => [...(m.state && !has(states, m.state) ? [`state ${m.state} (${m.id})`] : []), ...(m.empires ?? []).filter(e => !has(empires, e)).map(e => `empire ${e} (${m.id})`)]),
         ...Object.keys(COLOURS).filter(id => !has(blocks, id)).map(id => `colour for block ${id}`),
         ...Object.keys(EMPIRE_COLOURS).filter(id => !has(empires, id)).map(id => `colour for empire ${id}`),
         ...states.flatMap(s => s.properties.provinces).filter(id => !COLOURS[id]).map(id => `no colour for province ${id}`)

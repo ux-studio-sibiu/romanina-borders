@@ -29,13 +29,13 @@ simple, roughly traced shapes, not a research atlas.
    by a build script, into one optimised image. The map's land, sea and region layers then sit over it, toned down so the
    history colours stay readable.
 
-3. **The moments.** One content file with 13 moments (few enough for a child; close events share one), each with a
+3. **The moments** ✓ (after 4 and 5). One content file with 13 moments (few enough for a child; close events share one), each with a
    year, a title, one or two short sentences for children, an icon, and which map shape and empires it shows:
    c. 60 BC the Dacians and King Burebista · 101–271 the Romans in Dacia · 271–1000 the Romans leave, peoples pass
    through · c. 1000 Transylvania in the Kingdom of Hungary · 1330–1359 Wallachia and Moldavia are born · 1400–1504
    Mircea, Vlad and Stephen · 1600 Michael the Brave · 1775–1812 Bukovina and Bessarabia taken · 1859 Cuza and the
    Union · 1877–78 independence and the sea · 1918 the Great Union · 1940 lands lost in the war · today (1989 freedom,
-   2007 the EU). Lesson 05's `data/shape-timeline.ts` already lists them, with their shapes.
+   2007 the EU). In `data/moments.ts`, next to each moment's shape (lesson 05).
 
 4. **A simple trace tool** ✓ (built before 3). A dev-only page: drop in a public-domain map image, drag, scale and fade it until it roughly
    lines up with the backdrop, then click around a region to draw a shape. Shapes are smoothed automatically into

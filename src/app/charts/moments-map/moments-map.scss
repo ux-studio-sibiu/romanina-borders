@@ -48,6 +48,9 @@
 .state-name { margin: 0; font-weight: 700; }
 .status { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--status); color: var(--status); @include paper.mono-label(0.625rem, 0.08em); font-weight: 700; vertical-align: 2px; }
 .note { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+// The story, for children: the time in a child's terms, then the words, a size up
+.ago { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; font-style: italic; }
+.story { margin: 6px 0 0; font-size: 1.05rem; line-height: 1.5; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 0.9rem; }
 .legend li { display: flex; align-items: center; gap: 6px; }

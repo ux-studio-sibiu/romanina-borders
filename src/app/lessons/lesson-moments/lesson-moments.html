@@ -1,0 +1,74 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 03">
+  <h1>The moments</h1>
+  <p>The story's words: thirteen moments, from the Dacians to today, each a sentence or two a 7-to-10-year-old can read aloud. They live in one content file, <code>data/moments.ts</code>, next to each moment's map (lesson 05), and <a routerLink="/">the map page</a> tells them under the map. (Lesson 04 and 05 came first: the tool and the shapes, so the shapes could be built while the story was written.)</p>
+
+  <h2>1. The moments, as a child reads them</h2>
+  <ol class="moments">
+    @for (m of moments; track m.id) {
+      <li class="moment">
+        <div class="when">
+          <span class="label">{{ m.label }}</span>
+          <span class="ago">{{ yearsAgo(m.year) }}</span>
+        </div>
+        <h3 class="title">{{ m.title }}</h3>
+        <p class="text">{{ m.text }}</p>
+        <p class="meta">icon: {{ m.icon }} · map: {{ m.state ?? (m.status === 'trace' ? 'to trace' : 'arrows') }}</p>
+      </li>
+    }
+  </ol>
+
+  <h2>2. Thirteen, not eighteen</h2>
+  <ul>
+    <li>The first plan had eighteen moments. For a child, that's too many to hold: close events now share one. Wallachia (1330) and Moldavia (1359) are born together; Mircea, Vlad and Stephen are one age of brave princes; Trajan's wars and Roman Dacia are one moment; the Romans leaving and the peoples passing through are another; 1913 (Southern Dobruja) folds into independence and the Great Union.</li>
+    <li>Each moment keeps one idea a child can carry away: <em>the Romans came, and Romanian comes from their Latin</em>; <em>three lands, one prince, for a few months</em>; <em>everything joined in 1918</em>.</li>
+  </ul>
+
+  <h2>3. How the words are written</h2>
+  <ul>
+    <li><strong>Short sentences, one idea each,</strong> about 25–45 words a moment: long enough to say what happened, short enough to read aloud before a child turns the page.</li>
+    <li><strong>Names worth meeting again:</strong> Burebista, Decebalus, Trajan, Basarab, Bogdan, Stephen the Great, Michael the Brave, Cuza. Children will hear them at school; a story that names them makes them familiar.</li>
+    <li><strong>The time in a child's terms:</strong> under each year, "about 1,000 years ago", rounded so it reads like speech (<code>yearsAgo()</code>, from the moment's <code>year</code>).</li>
+    <li><strong>No gore.</strong> Vlad is "Vlad III", not by the nickname he is known for: the story is about defending a land, and a seven-year-old needn't meet impaling.</li>
+    <li><strong>Touchy moments told as what happened, without blame.</strong> Transylvania in Hungary: "step by step… Romanians, Hungarians and, later, Saxons… all lived there together". 1918: the assemblies "voted to join". 1940: Romania "had to give up lands", to whom, and that northern Transylvania came back. Today: the Republic of Moldova is "a country of its own".</li>
+    <li><strong>Simple, but not wrong</strong> (the roadmap's first principle): every sentence is checked below.</li>
+  </ul>
+
+  <h2>4. The facts behind them</h2>
+  <table>
+    <thead><tr><th>Moment</th><th>Checked</th></tr></thead>
+    <tbody>
+      <tr><td>Burebista</td><td>King of the Geto-Dacians c. 82–44 BC; united the tribes into a kingdom from the middle Danube to the Black Sea. "Around 60 BC" falls in his reign.</td></tr>
+      <tr><td>The Romans</td><td>Trajan's Dacian wars, 101–102 and 105–106; Decebalus died in 106; the province lasted until Aurelian's withdrawal, c. 271–275: about 165 years. Romanian is a Romance language, from the Latin spoken in the region.</td></tr>
+      <tr><td>Peoples passing through</td><td>Goths, Huns, Gepids, Avars, Slavs, Bulgars and Magyars, 3rd–10th centuries.</td></tr>
+      <tr><td>Transylvania in Hungary</td><td>Brought into the Kingdom of Hungary gradually, 10th–13th centuries; Saxon settlers from the Rhine and Moselle lands of the Holy Roman Empire (today's Germany and Luxembourg) arrived in the 12th century.</td></tr>
+      <tr><td>Basarab and Bogdan</td><td>Basarab I defeated Charles I of Hungary at Posada in November 1330; Bogdan I made Moldavia independent of Hungary in 1359.</td></tr>
+      <tr><td>Mircea, Vlad, Stephen</td><td>Mircea the Elder (1386–1418), Vlad III (ruled 1448, 1456–62, 1476), Stephen the Great (1457–1504), all fighting the Ottomans; Stephen founded dozens of churches and monasteries, Putna and Voroneț among them.</td></tr>
+      <tr><td>Michael the Brave</td><td>Prince of Wallachia from 1593, Transylvania from 1599, Moldavia from May 1600: the three under one ruler until the autumn of 1600.</td></tr>
+      <tr><td>Bukovina and Bessarabia</td><td>Bukovina to the Habsburg Monarchy ("Austria") in 1775; Bessarabia to the Russian Empire by the Treaty of Bucharest, 1812.</td></tr>
+      <tr><td>The Union</td><td>Alexandru Ioan Cuza elected prince of Moldavia (January 1859) and Wallachia (February 1859); the name Romania was in official use from 1862 and in the 1866 constitution: "soon called Romania".</td></tr>
+      <tr><td>Independence</td><td>Declared 9 May 1877, won in the war of 1877–78, recognised at the Congress of Berlin, 1878, which also gave Romania northern Dobruja and its coast.</td></tr>
+      <tr><td>The Great Union</td><td>Bessarabia voted in March/April 1918, Bukovina in November, Transylvania at Alba Iulia on 1 December 1918, Romania's national day since 1990.</td></tr>
+      <tr><td>1940</td><td>Bessarabia and northern Bukovina to the Soviet Union (June), northern Transylvania to Hungary (August), Southern Dobruja to Bulgaria (September); northern Transylvania returned to Romania after the war (Paris peace treaty, 1947).</td></tr>
+      <tr><td>Today</td><td>The revolution of December 1989 ended communist rule; Romania joined the European Union on 1 January 2007; the Republic of Moldova has been independent since 1991.</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Checked against the standard textbook account; worth a second read by a teacher before the site goes public (lesson 08's fact check).</p>
+
+  <h2>5. Icons</h2>
+  <p>Each moment names one icon for the player (lesson 06) to draw: the Dacian <em>wolf-banner</em>, the Roman <em>eagle</em>, a <em>horse</em> for the peoples on the move, a <em>crown</em>, a <em>castle</em>, a <em>shield</em>, a <em>sword</em>, a <em>map</em> for the lands taken, joined <em>hands</em> for the Union, a <em>flag</em>, a <em>storm</em> for 1940 and the EU's <em>star</em>. Only the names for now (<code>MomentIcon</code>), so the drawings can be made in one style together.</p>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>data/moments.ts</code> (was <code>data/shape-timeline.ts</code>): every moment's year, title, text and icon, next to its shape (lesson 05); <code>yearsAgo()</code></li>
+    <li><code>charts/moments-map/*</code>: without the working notes (the map page), the caption tells the moment's story</li>
+    <li><code>lessons/lesson-moments/*</code> (this page), <code>lessons.routes.ts</code></li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li>Read every moment aloud: does a 7-year-old follow it? Is any word too hard?</li>
+    <li>Every fact in the table matches its sentence</li>
+    <li><a routerLink="/">The map page</a>: pick a moment, the caption shows its years, "about … years ago" and its story</li>
+  </ul>
+</app-lesson-page>
