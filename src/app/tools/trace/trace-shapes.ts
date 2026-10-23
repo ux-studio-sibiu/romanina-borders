@@ -19,7 +19,8 @@ export interface TraceShape {
 // Where a reference map sits over the map, in units of the frame's width, so it stays put when the window is resized:
 // its centre (from the frame box's top-left corner), its width, a vertical stretch, a rotation and an opacity.
 export interface Alignment { cx: number; cy: number; width: number; stretch: number; rotate: number; opacity: number; }
-export const ALIGN_DEFAULTS: Alignment = { cx: 0.5, cy: 0.37, width: 1, stretch: 1, rotate: 0, opacity: 0.6 };
+// Starting at about the core's width (the area is 17.5° wide, the core 10.5°), centred on it
+export const ALIGN_DEFAULTS: Alignment = { cx: 0.5, cy: 0.42, width: 0.62, stretch: 1, rotate: 0, opacity: 0.6 };
 
 // The public-domain maps in reference-maps/ (see its SOURCES.md), served in development only (angular.json)
 export const REFERENCE_MAPS = [

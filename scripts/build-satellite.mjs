@@ -7,7 +7,7 @@
 // Runs once, at build time: the browser gets one ~230 kB picture, not an 88 MB tile.
 
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { geoConicConformal, geoGraticule, geoPath } from 'd3-geo';
@@ -18,10 +18,12 @@ const FILE = 'world.topo.bathy.200407.3x21600x21600.C1.jpg';
 const URL = `https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73751/${FILE}`;
 const TILE = { size: 21600, west: 0, north: 90, degrees: 90 };
 
-// The map's frame and projection: the same as region-map.ts, so the picture lines up with every line drawn over it
-const REGION = [[20, 43], [30.5, 48.5]];
-const projectionFor = () => geoConicConformal().parallels([44, 48]).rotate([-25, 0]);
-const OUT_WIDTH = 2000; // about the source's own detail across the region (~1,850 px): enough for a full-screen map
+// The map's area and projection, from src/app/data/region.json, as the app reads them: so the picture lines up with
+// every line drawn over it
+const region = JSON.parse(await readFile(join(dirname(fileURLToPath(import.meta.url)), '../src/app/data/region.json'), 'utf8'));
+const REGION = region.area;
+const projectionFor = () => geoConicConformal().parallels(region.projection.parallels).rotate(region.projection.rotate);
+const OUT_WIDTH = 3200; // about three quarters of the source's own detail across the area (~4,200 px): enough for a full-screen map
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cacheFile = join(root, 'scripts/.cache', FILE);

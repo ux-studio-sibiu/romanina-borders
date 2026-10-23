@@ -24,9 +24,10 @@ const FILES = {
   marine: 'ne_10m_geography_marine_polys'     // 1.7 MB: named seas, for the Black Sea
 };
 
-// The map's frame (region-map.ts): 20°–30.5° E, 43°–48.5° N. Its edges are meridians and parallels, so in [lon, lat] it is
-// exactly this box. Anything touching it is kept, whole: a unit cut at the frame would be useless for merging later.
-const REGION = [[20, 43], [30.5, 48.5]];
+// The map's area (src/app/data/region.json, shared with the app): the story's core and about a fifth more on every side,
+// so a full-screen map has land to its edges. Its edges are meridians and parallels, so in [lon, lat] it is exactly this
+// box. Anything touching it is kept, whole: a unit cut at the edge would be useless for merging later.
+const REGION = JSON.parse(await readFile(new URL('../src/app/data/region.json', import.meta.url), 'utf8')).area;
 const COUNTRIES = ['ROU', 'MDA', 'UKR', 'BGR', 'HUN', 'SRB']; // admin-1 units kept as units; every other country is merged into one shape
 
 // The six rivers, by their Natural Earth names. The Danube includes its delta branches (and the Borcea, a branch above the delta).
@@ -72,13 +73,18 @@ const nearby = source.admin1.features.filter(touches);
 
 // A stable id per unit: adm1_code. ISO 3166-2 isn't unique here: Natural Earth splits Moldova's raions that straddle the Dniester,
 // so there are two Rezina (MD-RE) and two left-bank units coded MD-SN.
-const units = nearby.filter(f => COUNTRIES.includes(f.properties.adm0_a3)).map(({ properties: p, geometry }) => ({
+// A unit's country, by the internationally recognised borders: Natural Earth puts Crimea and Sevastopol under Russia (de
+// facto control), though their ISO codes are Ukrainian (UA-43, UA-40); here they are Ukraine, as the UN, the EU and
+// Romania hold.
+const countryOf = p => p.iso_3166_2?.startsWith('UA-') ? 'UKR' : p.adm0_a3;
+
+const units = nearby.filter(f => COUNTRIES.includes(countryOf(f.properties))).map(({ properties: p, geometry }) => ({
   type: 'Feature',
   id: p.adm1_code,
-  properties: { name: p.name, country: p.adm0_a3, iso: p.iso_3166_2, type: p.type_en ?? p.type },
+  properties: { name: p.name, country: countryOf(p), iso: p.iso_3166_2, type: p.type_en ?? p.type },
   geometry
 }));
-const others = nearby.filter(f => !COUNTRIES.includes(f.properties.adm0_a3)).map(({ properties: p, geometry }) => ({
+const others = nearby.filter(f => !COUNTRIES.includes(countryOf(f.properties))).map(({ properties: p, geometry }) => ({
   type: 'Feature',
   id: p.adm0_a3,
   properties: { name: p.admin, country: p.adm0_a3 },
