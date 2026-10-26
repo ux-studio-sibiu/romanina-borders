@@ -1,12 +1,13 @@
 // Lesson 05: builds the map shapes that today's units (lesson 01) can make, from Roman Dacia to today.
 //   npm run data:shapes
 //
-// public/data/geography.topo.json → public/data/shapes.topo.json, four objects:
+// public/data/geography.topo.json → public/data/shapes.topo.json, five objects:
 //   blocks:  the historical provinces, each a group of today's units merged into one shape (Wallachia, Bessarabia, …)
 //   states:  the lands at each moment, as a list of blocks merged into one outline (106, c. 1000, 1359, c. 1400, 1600,
 //            1812, 1859, 1878, 1913, 1918, 1940, today)
 //   lands:   for a moment with several countries side by side (1359, c. 1400, 1812), each one's outline
 //   empires: the empires and kingdoms round or over the provinces, as far as the frame shows them
+//   zones:   soft, hand-drawn lands with no known border (Burebista's kingdom and its neighbours)
 // Rough on purpose (ROADMAP.md: "simple, but not wrong"): a province is the counties that are mostly in it today.
 
 import { readFile, writeFile } from 'node:fs/promises';
@@ -30,14 +31,15 @@ const BLOCKS = [
   { id: 'dobruja', name: 'Dobruja', nameRo: 'Dobrogea', units: ['ROU', 'Tulcea', 'Constanta'] },
   // Southern Dobruja: Bulgarian before 1913 and after 1940; today's Dobrich and Silistra provinces
   { id: 'cadrilater', name: 'Southern Dobruja', nameRo: 'Cadrilaterul', units: ['BGR', 'Dobrich', 'Silistra'] },
-  // Transylvania with Banat, Crișana and Maramureș, split along the 1940 line: the north went to Hungary 1940–1944.
-  // The line ran through Bihor, Cluj and Mureș counties; each is put on the side where most of it lay.
-  { id: 'transylvania-north', name: 'Northern Transylvania', nameRo: 'Transilvania de Nord', units: ['ROU', 'Satu Mare', 'Maramures', 'Bihor', 'Salaj', 'Cluj', 'Bistrita-Nasaud', 'Mures', 'Harghita', 'Covasna'] },
-  { id: 'transylvania-south', name: 'Southern Transylvania', nameRo: 'Transilvania de Sud', units: ['ROU', 'Alba', 'Sibiu', 'Brasov', 'Hunedoara'] },
-  // Arad: with the Banat, Ottoman from 1551 (Arad and Lipova), so also not in the 1600 union
-  { id: 'arad', name: 'Arad', nameRo: 'Arad', units: ['ROU', 'Arad'] },
-  // The Banat: Hungarian, then Ottoman from 1552 to 1716 (so not in Michael the Brave's union), Romanian from 1918
-  { id: 'banat', name: 'Banat', nameRo: 'Banatul', units: ['ROU', 'Timis', 'Caras-Severin'] },
+  // Transylvania with Crișana and Maramureș, split along the 1940 line: the north went to Hungary 1940–1944. The line ran
+  // through Bihor, Cluj and Mureș counties, which are cut along it (CUTS): Oradea, Cluj and Târgu Mureș north of it, Beiuș,
+  // Turda and Luduș south.
+  { id: 'transylvania-north', name: 'Northern Transylvania', nameRo: 'Transilvania de Nord', units: ['ROU', 'Satu Mare', 'Maramures', 'Salaj', 'Bistrita-Nasaud', 'Harghita', 'Covasna'], extra: ['bihor-north', 'cluj-north', 'mures-north'] },
+  { id: 'transylvania-south', name: 'Southern Transylvania', nameRo: 'Transilvania de Sud', units: ['ROU', 'Alba', 'Sibiu', 'Brasov', 'Hunedoara'], extra: ['bihor-south', 'cluj-south', 'mures-south'] },
+  // The Banat, with Arad: Hungarian, then Ottoman (Arad and Lipova from 1551, the Banat from 1552) until 1699 and 1716, so
+  // not in Michael the Brave's union, and Romanian from 1918. Arad north of the Mureș was Crișana, but it always went
+  // with the Banat, so at this level they are one.
+  { id: 'banat', name: 'Banat', nameRo: 'Banatul', units: ['ROU', 'Timis', 'Caras-Severin', 'Arad'] },
   // Bessarabia: Moldova west of the Dniester (the east bank, Transnistria, was never part of it), without the Budjak
   { id: 'bessarabia', name: 'Bessarabia', nameRo: 'Basarabia', units: ['MDA', '!Camenca', '!Stîngă Nistrului', '!Transnistria', '!Grigoriopol', '!Taraclia', '!Comrat', '!Basarabeasca'] },
   // The Budjak, the steppe at Bessarabia's southern end: Moldavian until the Ottomans took the coast (1484) and the Tatars
@@ -49,12 +51,13 @@ const BLOCKS = [
   // (each block is its own merge), which is fine.
   // Roman Dacia (106–271): Oltenia, the Banat and the Carpathian arc's inside, up to the forts on the eastern Carpathians
   // (Covasna, Harghita) and Porolissum in the north (Sălaj). Not Maramureș, Satu Mare, Crișana or the Arad plain (the free
-  // Dacians and the Sarmatians). Its eastern edge east of the Olt (the Limes Transalutanus) is a county line here: to
-  // adjust with a traced line.
-  { id: 'roman-dacia', name: 'Roman Dacia', nameRo: 'Dacia romană', units: ['ROU', 'Mehedinti', 'Gorj', 'Dolj', 'Vâlcea', 'Olt', 'Timis', 'Caras-Severin', 'Hunedoara', 'Alba', 'Sibiu', 'Brasov', 'Covasna', 'Harghita', 'Mures', 'Cluj', 'Salaj', 'Bistrita-Nasaud'] },
-  // Bogdan's Moldavia (1359): the early core in the north, round Suceava, Siret and Baia. It reached the Black Sea only
-  // around 1390. Rough: whole counties; to adjust against a map.
-  { id: 'moldavia-1359', name: 'Moldavia', nameRo: 'Moldova', units: [['ROU', 'Suceava', 'Botosani', 'Neamt'], ['UKR', 'Chernivtsi']] }
+  // Dacians and the Sarmatians). East of the Olt it reaches the Limes Transalutanus, the line of forts from the Danube near
+  // Flămânda up to Rucăr: the strips of Teleorman and Argeș west of it (CUTS).
+  { id: 'roman-dacia', name: 'Roman Dacia', nameRo: 'Dacia romană', units: ['ROU', 'Mehedinti', 'Gorj', 'Dolj', 'Vâlcea', 'Olt', 'Timis', 'Caras-Severin', 'Hunedoara', 'Alba', 'Sibiu', 'Brasov', 'Covasna', 'Harghita', 'Mures', 'Cluj', 'Salaj', 'Bistrita-Nasaud'], extra: ['teleorman-west', 'arges-west'] },
+  // Bogdan's Moldavia (1359): the early core in the north, round Suceava, Siret and Baia, between the Carpathians and the
+  // Prut, south to about a line from the mountains above Roman to the Prut above Iași (CUTS: Neamț and Iași cut along it).
+  // It reached the Black Sea only around 1390. Approximate: nobody knows its southern edge to the kilometre.
+  { id: 'moldavia-1359', name: 'Moldavia', nameRo: 'Moldova', units: [['ROU', 'Suceava', 'Botosani'], ['UKR', 'Chernivtsi']], extra: ['neamt-north', 'iasi-north'] }
 ];
 
 // The lands at each moment the story shows, as blocks
@@ -62,14 +65,14 @@ const STATES = [
   { id: '106', label: '106–271', name: 'Roman Dacia', blocks: ['roman-dacia'] },
   // Transylvania joining the Kingdom of Hungary, over the 10th–13th centuries: Transylvania with the Banat, Crișana and
   // Maramureș, all the Hungarian king's lands by 1200
-  { id: 'c1000', label: 'c. 1000', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat'] },
+  { id: 'c1000', label: 'c. 1000', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'banat'] },
   // Basarab's Wallachia (1330) and Bogdan's early Moldavia (1359), side by side
   { id: '1359', label: '1330–1359', name: 'Wallachia and Moldavia', blocks: ['wallachia', 'moldavia-1359'], lands: ['wallachia', 'moldavia-1359'] },
   // Mircea the Elder's Wallachia, Alexander the Good's Moldavia (from the mountains to the Dniester and the sea), and
   // Transylvania in the Kingdom of Hungary: three lands side by side (see LANDS). For the moments from 1400 to 1504.
-  { id: 'c1400', label: 'c. 1400', name: 'Wallachia, Moldavia and Transylvania', blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak', 'transylvania-north', 'transylvania-south', 'arad', 'banat'], lands: ['wallachia', 'moldavia-1400', 'transylvania-1400'] },
+  { id: 'c1400', label: 'c. 1400', name: 'Wallachia, Moldavia and Transylvania', blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak', 'transylvania-north', 'transylvania-south', 'banat'], lands: ['wallachia', 'moldavia-1400', 'transylvania-1400'] },
   // Michael the Brave's union, summer 1600: the three lands under one prince, without their Ottoman edges (Dobruja, the
-  // Banat and Arad, the Budjak). Simplified: Tighina, Ottoman from 1538, stays in.
+  // the Banat with Arad, the Budjak). Simplified: Tighina, Ottoman from 1538, stays in.
   { id: '1600', name: "Michael the Brave's union", blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'transylvania-north', 'transylvania-south'] },
   // After Bukovina (Austrian, 1775) and Bessarabia (Russian, 1812) were taken: Wallachia and what was left of Moldavia,
   // still two countries
@@ -77,9 +80,9 @@ const STATES = [
   { id: '1859', name: 'The United Principalities', blocks: ['wallachia', 'moldavia'] },
   { id: '1878', name: 'Independent Romania, with Dobruja', blocks: ['wallachia', 'moldavia', 'dobruja'] },
   { id: '1913', name: 'Romania after the Balkan War', blocks: ['wallachia', 'moldavia', 'dobruja', 'cadrilater'] },
-  { id: '1918', name: 'Greater Romania', blocks: ['wallachia', 'moldavia', 'dobruja', 'cadrilater', 'transylvania-north', 'transylvania-south', 'arad', 'banat', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak'] },
-  { id: '1940', name: 'Romania after the losses of 1940', blocks: ['wallachia', 'moldavia', 'dobruja', 'transylvania-south', 'arad', 'banat', 'bukovina-south'] },
-  { id: 'today', name: 'Romania today', blocks: ['wallachia', 'moldavia', 'dobruja', 'transylvania-north', 'transylvania-south', 'arad', 'banat', 'bukovina-south'] }
+  { id: '1918', name: 'Greater Romania', blocks: ['wallachia', 'moldavia', 'dobruja', 'cadrilater', 'transylvania-north', 'transylvania-south', 'banat', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak'] },
+  { id: '1940', name: 'Romania after the losses of 1940', blocks: ['wallachia', 'moldavia', 'dobruja', 'transylvania-south', 'banat', 'bukovina-south'] },
+  { id: 'today', name: 'Romania today', blocks: ['wallachia', 'moldavia', 'dobruja', 'transylvania-north', 'transylvania-south', 'banat', 'bukovina-south'] }
 ].map(s => ({ label: s.id, ...s })); // the label on its button, when it isn't the id
 
 // The separate countries of a moment that has several (1359, c. 1400, 1812), each merged from blocks
@@ -87,7 +90,7 @@ const LANDS = [
   { id: 'wallachia', name: 'Wallachia', blocks: ['wallachia'] },
   { id: 'moldavia-1359', name: 'Moldavia', blocks: ['moldavia-1359'] },
   { id: 'moldavia-1400', name: 'Moldavia', blocks: ['moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak'] },
-  { id: 'transylvania-1400', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat'] },
+  { id: 'transylvania-1400', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'banat'] },
   { id: 'moldavia-1812', name: 'Moldavia', blocks: ['moldavia'] }
 ];
 
@@ -109,28 +112,104 @@ const OTTOMAN_HUNGARY = ['Pest', 'Budapest', 'Érd', 'Bács-Kiskun', 'Kecskemét
 const UKRAINE_WEST = ['Transcarpathia', 'Chernivtsi', "Ivano-Frankivs'k", "L'viv", "Ternopil'"];
 const BALKANS = [['BGR'], ['KOS'], ['MNE'], ['MKD'], ['ALB'], ['BIH'], ['GRC'], ['TUR']];
 const EMPIRES = [
-  // Rome after Trajan: Roman Dacia, and everything south of the Danube (Moesia, Dalmatia, Thrace, Greece, Italy) with
-  // Dobruja, and Pannonia and Noricum west of it; not the plains north of it in Serbia and Hungary (the Sarmatians' land)
-  { id: 'roman-empire', name: 'Roman Empire', at: [26.4, 43.5], blocks: ['roman-dacia', 'dobruja'], units: [...BALKANS, ['HRV'], ['SVN'], ['AUT'], ['ITA'], ['SRB', ...not(VOJVODINA.slice(0, 6))], ['HUN', ...TRANSDANUBIA, 'Budapest']] },
+  // Rome after Trajan: Roman Dacia and Dobruja, and everything south of the Danube and the Rhine as far as the zoomed-out
+  // view shows (Italy, the Balkans, Greece, Asia Minor to the Euphrates, Syria, Gaul, Spain, Africa's coast), with
+  // Pannonia and Noricum; not the plains north of the Danube in Serbia and Hungary (the Sarmatians' land). Its moment
+  // is zoomed out, so all but the two provinces comes from the wide data's countries (`wide`), cut where needed (the
+  // microstates are too small for the wide data: they are islands inside Italy, Switzerland and France's shapes).
+  { id: 'roman-empire', name: 'Roman Empire', at: [26.4, 43.5], blocks: ['roman-dacia', 'dobruja'], wide: [
+    ...['ITA', 'MLT', 'SVN', 'HRV', 'BIH', 'MNE', 'KOS', 'MKD', 'ALB', 'GRC', 'BGR', 'AUT', 'CHE', 'FRA', 'LUX', 'BEL', 'ESP', 'AND',
+      'CYP', 'CYN', 'SYR', 'LBN', 'ISR', 'JOR', 'TUN', 'LBY'].map(country => ({ country })),
+    { country: 'SRB', keep: south([18.5, 45.3], [23.2, 44.35]) },   // south of the Danube, with Srem (Sirmium)
+    { country: 'HUN', keep: west([18.8, 45.7], [19.0, 48.1]) },     // Pannonia, west of the Danube, with Aquincum (Budapest)
+    { country: 'TUR', keep: west([40.3, 36], [40.3, 42.2]) },       // Asia Minor, to about the Euphrates
+    { country: 'DEU', keep: south([7, 49.6], [13.9, 48.75]) },       // Raetia and the Agri Decumates, behind the limes
+    { country: 'DZA', keep: north([0, 34.8], [12, 34.8]) }            // the coast of Mauretania and Numidia
+  ] },
   // The Kingdom of Hungary, c. 1000–1526: Transylvania, the Banat and Crișana, today's Hungary, Vojvodina, Slovakia,
   // Transcarpathia, and Croatia under its crown
-  { id: 'hungary', name: 'Kingdom of Hungary', at: [21.2, 47.2], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['HRV'], ['UKR', 'Transcarpathia']] },
+  { id: 'hungary', name: 'Kingdom of Hungary', at: [21.2, 47.2], blocks: ['transylvania-north', 'transylvania-south', 'banat'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['HRV'], ['UKR', 'Transcarpathia']] },
   // The Ottomans in the Balkans, from about 1400 to the 1800s: Bulgaria, Serbia south of the Danube, Bosnia, the lands to
   // the south, and Dobruja
   { id: 'ottoman', name: 'Ottoman Empire', at: [26.8, 43.5], blocks: ['dobruja'], units: [...BALKANS, SERBIA_SOUTH] },
-  // The Ottomans in 1600: also the Banat and Arad, Vojvodina, the middle of Hungary and the Budjak
-  { id: 'ottoman-1600', name: 'Ottoman Empire', at: [26.8, 43.5], blocks: ['dobruja', 'banat', 'arad', 'budjak'], units: [...BALKANS, ['SRB'], ['HUN', ...OTTOMAN_HUNGARY]] },
+  // The Ottomans in 1600: also the Banat (with Arad), Vojvodina, the middle of Hungary and the Budjak
+  { id: 'ottoman-1600', name: 'Ottoman Empire', at: [26.8, 43.5], blocks: ['dobruja', 'banat', 'budjak'], units: [...BALKANS, ['SRB'], ['HUN', ...OTTOMAN_HUNGARY]] },
   // The Habsburg Empire (Austria-Hungary from 1867), 1775–1918: Transylvania, the Banat, Bukovina, Galicia, Hungary,
   // Vojvodina, Austria, Slovenia, Croatia, Slovakia, Bohemia and Moravia (Czechia) and southern Poland (Galicia's west), which is all the
   // area shows of Poland
-  { id: 'habsburg', name: 'Habsburg Empire', at: [24.3, 46.7], blocks: ['transylvania-north', 'transylvania-south', 'arad', 'banat', 'bukovina-south', 'bukovina-north'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['CZE'], ['AUT'], ['SVN'], ['HRV'], ['POL'], ['UKR', ...UKRAINE_WEST]] },
+  { id: 'habsburg', name: 'Habsburg Empire', at: [24.3, 46.7], blocks: ['transylvania-north', 'transylvania-south', 'banat', 'bukovina-south', 'bukovina-north'], units: [['HUN'], ['SRB', ...VOJVODINA], ['SVK'], ['CZE'], ['AUT'], ['SVN'], ['HRV'], ['POL'], ['UKR', ...UKRAINE_WEST]] },
   // The Russian Empire, 1812–1917: Bessarabia with the Budjak (all of today's Moldova and the Odessa region), and
   // Ukraine east of Galicia, Crimea included
-  { id: 'russian-empire', name: 'Russian Empire', at: [29.0, 47.2], units: [['MDA'], ['UKR', ...not(UKRAINE_WEST)]] },
+  { id: 'russian-empire', name: 'Russian Empire', at: [30.7, 47.5], units: [['MDA'], ['UKR', ...not(UKRAINE_WEST)]] },
   // 1940: the Soviet Union took Bessarabia and northern Bukovina (Galicia it had taken from Poland in 1939); Hungary took
   // northern Transylvania (Transcarpathia in 1939)
-  { id: 'soviet-union', name: 'Soviet Union', at: [28.8, 47.2], units: [['MDA'], ['UKR', '!Transcarpathia']] },
-  { id: 'hungary-1940', name: 'Hungary', at: [23.8, 47.35], blocks: ['transylvania-north'], units: [['HUN'], ['UKR', 'Transcarpathia']] }
+  { id: 'soviet-union', name: 'Soviet Union', at: [30.7, 47.5], units: [['MDA'], ['UKR', '!Transcarpathia']] },
+  { id: 'hungary-1940', name: 'Hungary', at: [21.2, 47.2], blocks: ['transylvania-north'], units: [['HUN'], ['UKR', 'Transcarpathia']] }
+];
+
+// Soft zones: lands whose borders nobody knows, drawn by hand as a rough ring in [lon, lat], rounded off (Chaikin's corner
+// cutting) and shown with a blurred edge, never a line (region-map). Burebista's kingdom, c. 60 BC: from the middle
+// Danube by Slovakia and the Hungarian plain, along the Danube and the Balkan range, to the Black Sea coast from Apollonia
+// to Olbia on the Bug, and north to the edge of Galicia. It stands for the Getae and Dacians before him too. Then its
+// neighbours, for a moment that zooms out to show them (lesson 06): rough, the way a children's atlas draws them. A zone
+// is one ring (`points`) or several (`parts`: the Roman Republic, on both sides of the Adriatic).
+const ZONES = [
+  {
+    // From the middle Danube (where he beat the Boii) to the Dniester's mouth at Tyras, the Carpathians' northern edge
+    // to the crest of the Balkan range, with the Greek cities of the coast from Tyras to Apollonia (Olbia he sacked, but
+    // didn't hold). All the zones adjusted by hand in a zone editor (lesson 07).
+    id: 'burebista', name: 'Kingdom of Burebista', nameRo: 'Regatul lui Burebista', points: [
+      [18.9, 48.0], [18.8, 47.3], [19.3, 46.0], [20.6, 44.8], [22.6, 43.4], [24.0, 42.9], [25.5, 42.75], [27.12, 43.01],
+      [27.95, 42.2], [28.77, 43.62], [30.16, 44.79], [30.8, 46.25], [29.96, 47.12], [29.71, 48.07], [27.63, 48.55], [25.47, 48.52],
+      [23.19, 48.78], [21.48, 48.92], [19.6, 48.5]
+    ]
+  },
+  // Rome c. 60 BC, one shape round the seas it held: Italy, Illyricum's coast, Macedonia, Greece, the province of Asia,
+  // and Bithynia et Pontus on the north coast of Asia Minor (Pompey, 63 BC); the Adriatic and the Aegean inside
+  {
+    id: 'roman-republic', name: 'Roman Republic', nameRo: 'Republica Romană', points: [
+      [8.6, 45.81], [10.77, 46.18], [11.97, 46.57], [14.17, 46.24], [14.52, 46.24], [15.69, 44.99], [16.84, 43.77], [19.09, 42.93],
+      [20.06, 42.23], [20.5, 42.2], [22.5, 42.2], [24.5, 41.6], [26.0, 40.8], [27.5, 40.3], [28.61, 41.36], [31.5, 41.3],
+      [33.21, 42.42], [35.2, 42.0], [36.65, 41.42], [37.78, 41.05], [37.42, 40.19], [34.52, 40.61], [32.09, 40.18], [29.96, 39.42],
+      [30.0, 38.8], [28.6, 37.0], [26.9, 37.4], [24.5, 37.8], [22.5, 36.4], [21.6, 37.0], [20.5, 38.7], [19.5, 40.0],
+      [18.19, 39.59], [17.2, 40.4], [16.6, 39.0], [15.7, 38.0], [15.6, 40.0], [14.2, 40.8], [12.13, 41.64], [10.74, 42.54],
+      [9.34, 44.13]
+    ]
+  },
+  // The Celts, one fill: the Boii in Bohemia and Pannonia (whom Burebista defeated) and the Scordisci round today's
+  // Belgrade, two rings that overlap
+  {
+    id: 'celts', name: 'Celts', nameRo: 'Celți', parts: [
+      [
+        [13.0, 50.6], [16.69, 51.51], [18.25, 51.04], [19.12, 50.04], [19.43, 48.75], [18.98, 46.75], [17.05, 43.32], [14.87, 46.18],
+        [13.24, 47.7], [12.72, 48.6], [12.5, 49.5]
+      ],
+      [
+        [17.97, 46.38], [20.75, 45.54], [22.45, 44.43], [24.23, 42.16], [19.16, 42.42], [16.73, 43.55]
+      ]
+    ]
+  },
+  // The Thracians: the Odrysian kingdom, south of the Balkan range
+  { id: 'thracians', name: 'Thracians', nameRo: 'Traci', points: [
+    [22.65, 42.49], [24.15, 43.43], [27.43, 43.1], [28.07, 42.83], [29.04, 41.61], [28.91, 40.88], [27.52, 40.46], [25.47, 40.75],
+    [24.6, 41.2], [23.6, 41.7]
+  ] },
+  // North and east: the Bastarnae, Burebista's allies; the Sarmatians on the steppe; the Scythians and the Bosporan
+  // kingdom in Crimea
+  { id: 'bastarnae', name: 'Bastarnae', nameRo: 'Bastarni', points: [
+    [21.98, 50.51], [26.14, 50.39], [28.96, 49.72], [30.57, 48.56], [29.68, 47.46], [28.52, 48.01], [26.61, 48.32], [24.44, 47.92],
+    [22.39, 48.3], [20.37, 49.06]
+  ] },
+  { id: 'sarmatians', name: 'Sarmatians', nameRo: 'Sarmați', points: [
+    [33.0, 50.2], [37.5, 50.0], [40.5, 48.5], [40.5, 46.8], [38.5, 46.5], [34.48, 46.66], [32.05, 47.32], [32.6, 48.5]
+  ] },
+  { id: 'scythians', name: 'Scythians', nameRo: 'Sciți', points: [
+    [31.28, 47.28], [34.54, 47.09], [35.82, 46.19], [35.01, 44.26], [33.37, 44.28], [32.5, 45.4]
+  ] },
+  { id: 'bosporan', name: 'Bosporan Kingdom', nameRo: 'Regatul Bosporan', points: [
+    [35.4, 45.6], [36.6, 45.6], [38.0, 46.5], [39.2, 47.3], [39.7, 47.0], [38.8, 45.6], [38.3, 44.9], [37.4, 44.6],
+    [36.4, 45.0], [35.4, 45.0]
+  ] }
 ];
 
 // Provinces split only for the moments that need it (Transylvania by the 1940 line, Bukovina by the 1775–1918 one): where
@@ -138,6 +217,11 @@ const EMPIRES = [
 const COMBINED = [
   { id: 'transylvania', name: 'Transylvania', nameRo: 'Transilvania', parts: ['transylvania-north', 'transylvania-south'] },
   { id: 'bukovina', name: 'Bukovina', nameRo: 'Bucovina', parts: ['bukovina-north', 'bukovina-south'] }
+];
+// Merged shapes for drawing a land as one piece where the moments don't join it themselves: Bessarabia with the Budjak, as
+// it was taken in 1812 and in 1940 (a moment's `lost` lands, data/moments.ts). Not joined in `provinces`.
+const MERGED = [
+  { id: 'bessarabia-all', name: 'Bessarabia', nameRo: 'Basarabia', parts: ['bessarabia', 'budjak'] }
 ];
 const provincesOf = ids => COMBINED.reduce((list, c) => c.parts.every(p => list.includes(p))
   ? list.flatMap(id => id === c.parts.find(p => list.includes(p)) ? [c.id] : c.parts.includes(id) ? [] : [id])
@@ -151,27 +235,56 @@ const NOTCHES = [
   { name: 'Razim–Sinoe lagoons', from: [29.316, 44.799], to: [28.844, 44.494], via: [[28.99, 44.69]] }
 ];
 
-// The Budjak (southern Bessarabia) is the part of today's Odessa region west of the Dniester and its estuary. The region
-// comes as one unit, so it is cut with this convex polygon in [lon, lat]: its east edge runs down the estuary, from near
-// Palanca (where the Dniester leaves Moldova) to the sea below Zatoka.
-const BUDJAK_CUT = [[28, 44.9], [28, 46.62], [30.05, 46.62], [30.6, 46.0], [31, 45.3]];
+// Pieces of units, for borders that run through a unit rather than along its edge: each unit is clipped to a convex
+// polygon in [lon, lat] (Sutherland–Hodgman, clip() below), and blocks take the pieces by id (`extra`). A piece keeps the
+// unit's own points along its other borders, so it still merges with its neighbours; two halves of one unit are cut along
+// the same line, with the same points on it, so they merge with each other without a gap. Approximate lines, a child's
+// map: nobody knows these borders to the kilometre. A cut along a straight `line` doesn't stay straight: its stretch of
+// edge wanders a few kilometres either side (wander() below), so it looks like a border, not a ruler's line.
+// The Budjak (southern Bessarabia) is the part of today's Odessa region west of the Dniester and its estuary: its east
+// edge runs down the estuary, from near Palanca (where the Dniester leaves Moldova) to the sea below Zatoka.
+const CUTS = [
+  { id: 'budjak', unit: ['UKR', 'Odessa'], keep: [[28, 44.9], [28, 46.62], [30.05, 46.62], [30.6, 46.0], [31, 45.3]] },
+  // The 1940 line (the Second Vienna Award) through three counties: north of it went to Hungary
+  ...halves('bihor', ['ROU', 'Bihor'], [21.0, 46.73], [23.0, 46.78]),   // Oradea and Salonta north, Beiuș south
+  ...halves('cluj', ['ROU', 'Cluj'], [22.6, 46.64], [24.3, 46.62]),     // Cluj and Huedin north, Turda south
+  ...halves('mures', ['ROU', 'Mures'], [24.0, 46.50], [25.3, 46.42]),   // Târgu Mureș and Reghin north, Luduș and Sighișoara south
+  // Bogdan's Moldavia: north of a line from the Carpathians above Roman to the Prut above Iași
+  { id: 'neamt-north', unit: ['ROU', 'Neamt'], keep: north([24.5, 46.85], [28.3, 47.3]), line: [[24.5, 46.85], [28.3, 47.3]] },
+  { id: 'iasi-north', unit: ['ROU', 'Iasi'], keep: north([24.5, 46.85], [28.3, 47.3]), line: [[24.5, 46.85], [28.3, 47.3]] },
+  // The Limes Transalutanus, from the Danube near Flămânda up to Rucăr: Roman Dacia west of it
+  { id: 'teleorman-west', unit: ['ROU', 'Teleorman'], keep: west([25.1, 43.6], [25.15, 45.6]), line: [[25.1, 43.6], [25.15, 45.6]] },
+  { id: 'arges-west', unit: ['ROU', 'Arges'], keep: west([25.1, 43.6], [25.15, 45.6]), line: [[25.1, 43.6], [25.15, 45.6]] }
+];
+
+// The convex polygons on either side of the line from a to b (west to east, or south to north), out to well past any unit
+function north(a, b) { return [a, b, [b[0], 52], [a[0], 52]]; }
+function south(a, b) { return [a, b, [b[0], 40], [a[0], 40]]; }
+function west(a, b) { return [a, b, [14, b[1]], [14, a[1]]]; }
+function halves(id, unit, a, b) { return [{ id: `${id}-north`, unit, keep: north(a, b), line: [a, b] }, { id: `${id}-south`, unit, keep: south(a, b), line: [a, b] }]; }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const source = JSON.parse(await readFile(join(root, 'public/data/geography.topo.json'), 'utf8'));
 const units = feature(source, source.objects.units).features;
 // The other countries, each one shape (Slovakia, Kosovo, Montenegro): for the empires
 const neighbours = feature(source, source.objects.neighbours).features;
+// The wide data's countries (npm run data:wide), for an empire reaching past the area
+const wide = JSON.parse(await readFile(join(root, 'public/data/geography-wide.topo.json'), 'utf8'));
+const wideCountries = feature(wide, wide.objects.neighbours).features;
 
-// --- 1. The Budjak, cut out of the Odessa region -----------------------------------------------------------------------
-const odessa = units.find(u => u.properties.country === 'UKR' && u.properties.name === 'Odessa');
-const polygons = odessa.geometry.type === 'Polygon' ? [odessa.geometry.coordinates] : odessa.geometry.coordinates;
-const cut = polygons.map(rings => rings.map(ring => clip(ring, BUDJAK_CUT)).filter(r => r.length >= 4)).filter(rings => rings.length);
-const budjak = { type: 'Feature', properties: { name: 'Budjak', country: 'UKR', piece: 'budjak' }, geometry: { type: 'MultiPolygon', coordinates: cut } };
+// --- 1. The pieces, cut out of their units -------------------------------------------------------------------------------
+const cutPieces = CUTS.map(({ id, unit: [country, name], keep, line }) => {
+  const unit = units.find(u => u.properties.country === country && u.properties.name === name);
+  if (!unit) throw new Error(`No unit ${country} ${name} (cut ${id})`);
+  const polygons = unit.geometry.type === 'Polygon' ? [unit.geometry.coordinates] : unit.geometry.coordinates;
+  const cut = polygons.map(rings => rings.map(ring => clip(ring, keep)).filter(r => r.length >= 4).map(ring => line ? wander(ring, line) : ring)).filter(rings => rings.length);
+  return { type: 'Feature', properties: { name: `${name} (${id})`, country, piece: id }, geometry: { type: 'MultiPolygon', coordinates: cut } };
+});
 
-// --- 2. One topology of every unit and the Budjak, so merging can drop the borders between them ------------------------
-// The units' shared borders come out of feature() with identical coordinates, and the Budjak keeps the Odessa region's
-// own points along the Moldovan border, so topology() finds the shared arcs again.
-const pieces = { type: 'FeatureCollection', features: [...units, ...neighbours, budjak] };
+// --- 2. One topology of every unit and every piece, so merging can drop the borders between them ------------------------
+// The units' shared borders come out of feature() with identical coordinates, and the pieces keep their unit's own points
+// along its other borders, so topology() finds the shared arcs again.
+const pieces = { type: 'FeatureCollection', features: [...units, ...neighbours, ...cutPieces] };
 const topo = topology({ pieces });
 const geometries = topo.objects.pieces.geometries;
 
@@ -195,18 +308,41 @@ const blockUnits = new Map(BLOCKS.map(b => [b.id, unitsOf(b)]));
 const merged = ids => closeNotches(rightWayRound(merge(topo, ids.flatMap(b => blockUnits.get(b)))));
 const blocks = [
   ...BLOCKS.map(({ id, name, nameRo }) => ({ type: 'Feature', id, properties: { name, nameRo }, geometry: merged([id]) })),
-  ...COMBINED.map(({ id, name, nameRo, parts }) => ({ type: 'Feature', id, properties: { name, nameRo, parts }, geometry: merged(parts) }))
+  ...[...COMBINED, ...MERGED].map(({ id, name, nameRo, parts }) => ({ type: 'Feature', id, properties: { name, nameRo, parts }, geometry: merged(parts) }))
 ];
 const states = STATES.map(({ id, label, name, blocks: ids, lands }) => ({
   type: 'Feature', id, properties: { label, name, blocks: ids, provinces: provincesOf(ids), ...(lands && { lands }) }, geometry: merged(ids)
 }));
 const lands = LANDS.map(({ id, name, blocks: ids }) => ({ type: 'Feature', id, properties: { name, blocks: ids }, geometry: merged(ids) }));
+// Each part rounded off and turned the right way round on its own, then together as one shape
+const zones = ZONES.map(({ id, name, nameRo, points, parts = [points] }) => ({
+  type: 'Feature', id, properties: { name, nameRo },
+  geometry: { type: 'MultiPolygon', coordinates: parts.map(p => rightWayRound({ type: 'Polygon', coordinates: [chaikin(p, 3)] }).coordinates) }
+}));
 // An empire's units: its provinces' and its own lists', each unit once (a unit listed twice would merge away entirely:
 // merge drops every arc two of its polygons share)
-const empires = EMPIRES.map(({ id, name, at, blocks: ids = [], units: groups = [] }) => {
+const empires = EMPIRES.map(({ id, name, at, blocks: ids = [], units: groups = [], wide = [] }) => {
   const all = [...new Set([...ids.flatMap(b => blockUnits.get(b)), ...(groups.length ? unitsOf({ id, units: groups }) : [])])];
-  return { type: 'Feature', id, properties: { name, at }, geometry: closeNotches(rightWayRound(merge(topo, all))) };
+  const geometry = closeNotches(rightWayRound(merge(topo, all)));
+  if (!wide.length) return { type: 'Feature', id, properties: { name, at }, geometry };
+  // Beside it, the wide countries merged in a topology of their own (they don't share points with today's units, so the
+  // two sit side by side, touching along the Danube)
+  return { type: 'Feature', id, properties: { name, at }, geometry: { type: 'MultiPolygon', coordinates: [...geometry.coordinates, ...wideLands(id, wide).coordinates] } };
 });
+
+// The wide data's countries, each whole or clipped to a convex `keep`, merged into one shape (for an empire)
+function wideLands(id, list) {
+  const features = list.map(({ country, keep }) => {
+    const f = wideCountries.find(c => c.properties.country === country);
+    if (!f) throw new Error(`No wide country ${country} (empire ${id})`);
+    if (!keep) return f;
+    const polygons = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    const cut = polygons.map(rings => rings.map(ring => clip(ring, keep)).filter(r => r.length >= 4)).filter(rings => rings.length);
+    return { ...f, geometry: { type: 'MultiPolygon', coordinates: cut } };
+  });
+  const wideTopo = topology({ countries: collection(features) });
+  return rightWayRound(merge(wideTopo, wideTopo.objects.countries.geometries));
+}
 
 // --- 4. Simplify, and write as TopoJSON -------------------------------------------------------------------------------
 // The states share their borders with the blocks, so each line is stored once, and simplifying the shared topology moves
@@ -216,14 +352,14 @@ const empires = EMPIRES.map(({ id, name, at, blocks: ids = [], units: groups = [
 // SIMPLIFY (Visvalingam: the area of the triangle a point makes with its neighbours, in square degrees).
 const MIN_RING = 0.02;   // ≈ 175 km² at 46° N: the Danube delta's islands and the Budjak's spits and lagoons go
 const SIMPLIFY = 0.0015; // ≈ 15 px² at the full-screen map's scale: wiggles go, the shape of every coast and bend stays
-let out = topology({ blocks: collection(blocks), states: collection(states), lands: collection(lands), empires: collection(empires) });
+let out = topology({ blocks: collection(blocks), states: collection(states), lands: collection(lands), empires: collection(empires), zones: collection(zones) });
 out = filter(out, filterWeight(out, MIN_RING));
 out = simplify(presimplify(out), SIMPLIFY);
 out = quantize(out, 1e5);
 const file = join(root, 'public/data/shapes.topo.json');
 await writeFile(file, JSON.stringify(out));
 
-console.log(`Blocks: ${BLOCKS.map(b => `${b.id} (${blockUnits.get(b.id).length})`).join(', ')}; combined: ${COMBINED.map(c => c.id).join(', ')}`);
+console.log(`Blocks: ${BLOCKS.map(b => `${b.id} (${blockUnits.get(b.id).length})`).join(', ')}; combined: ${[...COMBINED, ...MERGED].map(c => c.id).join(', ')}`);
 console.log(`Provinces shown: ${states.map(s => `${s.id}: ${s.properties.provinces.join(' ')}`).join(' | ')}`);
 const parts = o => out.objects.states.geometries.find(g => g.id === o)?.arcs.length;
 console.log(`States: ${states.map(s => `${s.id} ${s.geometry.coordinates.length} → ${parts(s.id)} part(s)`).join(', ')}`);
@@ -237,7 +373,8 @@ function collection(features) { return { type: 'FeatureCollection', features }; 
 // wound the other way: turn every ring round (lesson 04 has the same check).
 function rightWayRound(geometry) {
   if (geoArea(geometry) <= 2 * Math.PI) return geometry;
-  return { ...geometry, coordinates: geometry.coordinates.map(rings => rings.map(r => [...r].reverse())) };
+  const turn = rings => rings.map(r => [...r].reverse());
+  return { ...geometry, coordinates: geometry.type === 'Polygon' ? turn(geometry.coordinates) : geometry.coordinates.map(turn) };
 }
 
 // Each notch, in every ring that has both its ends: the shorter way round the ring between them (the way round the lagoon,
@@ -268,10 +405,14 @@ function closeNotches(geometry) {
 function clip(ring, convex) {
   const sign = Math.sign(area(convex)); // which side of each edge is inside
   const inside = (p, a, b) => sign * ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) >= 0;
-  const cross = (p, q, a, b) => {
+  // Where edge p–q crosses line a–b. Both are put in a fixed order first, and the point is rounded, so the two halves of a
+  // unit cut along one line (where the line is traversed the other way round) get exactly the same point, and merge.
+  const cross = (p0, q0, a0, b0) => {
+    const [p, q] = order(p0, q0), [a, b] = order(a0, b0);
     const t = ((a[0] - p[0]) * (b[1] - a[1]) - (a[1] - p[1]) * (b[0] - a[0])) / ((q[0] - p[0]) * (b[1] - a[1]) - (q[1] - p[1]) * (b[0] - a[0]));
-    return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
+    return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])].map(v => Math.round(v * 1e9) / 1e9);
   };
+  const order = (u, v) => u[0] < v[0] || (u[0] === v[0] && u[1] <= v[1]) ? [u, v] : [v, u];
   let points = ring.slice(0, -1);
   convex.forEach((a, i) => {
     const b = convex[(i + 1) % convex.length], input = points;
@@ -283,6 +424,51 @@ function clip(ring, convex) {
     });
   });
   return points.length ? [...points, points[0]] : [];
+}
+
+// A ring whose stretches along a cut line wander like a natural border: points every 0.02° along each stretch, pushed
+// sideways by three waves of different lengths (0.6°, 0.23° and 0.09°, the longest strongest, about 6 km at most). The
+// push depends only on the position along the line, and fades to nothing at each stretch's ends, where it meets the
+// unit's own border; so the two halves of a unit cut along one line get the very same points (generated in one
+// direction, reversed for the other), and still merge. The waves' phases come from the line itself, so every line
+// wanders its own way, the same way on every build.
+function wander([...ring], [a, b]) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+  const off = p => (p[0] - a[0]) * -uy + (p[1] - a[1]) * ux;   // sideways from the line
+  const along = p => (p[0] - a[0]) * ux + (p[1] - a[1]) * uy;
+  const onLine = p => Math.abs(off(p)) < 1e-7;
+  const seed = Math.abs(Math.sin(a[0] * 12.9898 + a[1] * 78.233 + b[0] * 37.719 + b[1] * 4.581)) * 43758.5453;
+  const phase = k => (seed * (k + 1)) % (2 * Math.PI);
+  const push = t => 0.06 * Math.sin(2 * Math.PI * t / 0.6 + phase(0)) + 0.025 * Math.sin(2 * Math.PI * t / 0.23 + phase(1)) + 0.012 * Math.sin(2 * Math.PI * t / 0.09 + phase(2));
+  const round = v => Math.round(v * 1e9) / 1e9;
+  const out = [];
+  for (let i = 0; i < ring.length - 1; i++) {
+    const p = ring[i], q = ring[i + 1];
+    out.push(p);
+    if (!onLine(p) || !onLine(q)) continue;
+    const s0 = along(p), s1 = along(q), lo = Math.min(s0, s1), hi = Math.max(s0, s1), n = Math.ceil((hi - lo) / 0.02);
+    const between = [];
+    for (let k = 1; k < n; k++) {
+      const t = lo + (hi - lo) * k / n, w = push(t) * Math.sin(Math.PI * k / n);
+      between.push([round(a[0] + ux * t - uy * w), round(a[1] + uy * t + ux * w)]);
+    }
+    out.push(...(s0 <= s1 ? between : between.reverse()));
+  }
+  out.push(ring.at(-1));
+  return out;
+}
+
+// Chaikin's corner cutting on a closed ring: each pass replaces every corner with two points a quarter of the way along
+// its edges, so after a few passes the hand-placed corners become smooth curves. Returns the ring closed.
+function chaikin(points, passes) {
+  let ring = points;
+  for (let k = 0; k < passes; k++) {
+    ring = ring.flatMap((p, i) => {
+      const q = ring[(i + 1) % ring.length];
+      return [[0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]], [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]];
+    });
+  }
+  return [...ring, ring[0]];
 }
 
 function area(ring) { return ring.reduce((s, p, i) => { const q = ring[(i + 1) % ring.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2; }

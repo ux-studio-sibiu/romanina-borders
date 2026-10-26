@@ -6,7 +6,7 @@ import { routes } from './app.routes';
 
 // Zoneless is the default since Angular 21: no zone.js, no provideZoneChangeDetection().
 // The screen updates only when a signal read by a template changes (or an event marks it dirty).
-// No SSR either: everything runs in the browser, so the map can measure the window and GSAP can start without platform checks.
+// No SSR either: everything runs in the browser, so the map can measure the window and animate without platform checks.
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),

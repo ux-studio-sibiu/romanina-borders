@@ -5,13 +5,14 @@ description: >-
   out small wiggles, close coastal lagoons and inlets the coastline wraps round (as done for Lake Razim), and keep every
   province and state sharing its borders exactly. Use whenever the user says an outline "wraps around" a lake, lagoon,
   island or delta, asks to "simplify", "smooth" or "clean up" the borders or outlines, says a shape is too detailed or
-  jagged, wants a lagoon or inlet "filled in" or "made continuous", or adds new derived shapes to
-  scripts/build-shapes.mjs that need the same treatment.
+  jagged, wants a lagoon or inlet "filled in" or "made continuous", wants a border that runs through a county drawn
+  (cut a county along a line), says a cut line looks "too straight" or "artificial", wants a soft or fuzzy zone for a
+  land with no known border, or adds new derived shapes to scripts/build-shapes.mjs that need the same treatment.
 ---
 
 # Smoothing the map shapes' borders
 
-The derived shapes (provinces, states, lands) are built by `scripts/build-shapes.mjs` (`npm run data:shapes`) from
+The derived shapes (provinces, states, lands, empires, soft zones) are built by `scripts/build-shapes.mjs` (`npm run data:shapes`) from
 today's units in `public/data/geography.topo.json`, into `public/data/shapes.topo.json`. All the smoothing happens in
 that script, at build time, never in the browser. The base map (lesson 01) is deliberately left detailed: its lines are
 snapping targets for the trace tool; only the picture-book shapes are simplified.
@@ -23,25 +24,49 @@ each shape were simplified on its own, the same border would be simplified diffe
 would open between neighbours. So:
 
 1. Build every shape as GeoJSON (merges of units).
-2. Put **all** of them into **one** topology: `topology({ blocks, states, lands, empires })`. Identical coordinates become one
+2. Put **all** of them into **one** topology: `topology({ blocks, states, lands, empires, zones })`. Identical coordinates become one
    shared arc.
 3. Filter and simplify **that topology**. Each arc is changed once, and every shape that uses it gets the same line.
 4. Quantize last (`quantize(out, 1e5)`).
 
-Anything that edits coordinates (cutting the Budjak, closing a lagoon) must happen **before** step 2 and must give
-identical coordinates to every shape that shares that coast, or the arcs stop being shared.
+Anything that edits coordinates (cutting a unit, wandering a cut line, closing a lagoon) must happen **before** step 2
+and must give identical coordinates to every shape that shares that edge, or the arcs stop being shared.
 
 An empire is merged from provinces and unit lists at once: dedupe the units first (`new Set`). A unit in the list twice
 makes `merge` drop all its arcs, as if they were inside borders, and it vanishes from the outline.
 
 ## The steps, in the order the script runs them
 
-### 1. Cut a unit in two when the data's unit is too coarse
+### 1. Cut a unit where an old border ran through it (`CUTS`)
 
-Example: the Budjak is only the part of Ukraine's Odessa region west of the Dniester estuary. The script clips the
-region with a hand-placed **convex** polygon (`BUDJAK_CUT`, `[lon, lat]`) using Sutherland–Hodgman (`clip()`). The clip
-polygon must be convex (check that every turn goes the same way) or the clip is wrong. The piece keeps the unit's own
-points along its other borders, so it still shares them with its neighbours.
+When a border ran through a unit rather than along its edge, the unit is clipped to a convex polygon in [lon, lat]
+(Sutherland–Hodgman, `clip()`), and blocks take the pieces by id (`extra: ['bihor-north', …]`). Each entry:
+
+```js
+{ id: 'budjak', unit: ['UKR', 'Odessa'], keep: [[28, 44.9], [28, 46.62], [30.05, 46.62], [30.6, 46.0], [31, 45.3]] },
+...halves('cluj', ['ROU', 'Cluj'], [22.6, 46.64], [24.3, 46.62]),   // two pieces, north and south of one line
+{ id: 'iasi-north', unit: ['ROU', 'Iasi'], keep: north(a, b), line: [a, b] },
+```
+
+- The clip polygon **must be convex** (every turn the same way) or the clip is wrong. `north()`, `south()` and `west()`
+  build the convex box on one side of a line `a → b`; `halves()` makes both sides of one line at once.
+- A piece keeps the unit's own points along its other borders, so it still merges with its neighbours.
+- **Two halves of one unit must get identical points along the cut**, or merging them back (Transylvania whole, 1918,
+  today) leaves a sliver. `clip()` orders the edge and the line canonically before intersecting and rounds the point to
+  1e-9, so both halves get the same coordinates.
+- Today's cuts: the Budjak (the Dniester estuary), the 1940 line through Bihor, Cluj and Mureș, early Moldavia's southern
+  edge through Neamț and Iași, and the Roman frontier east of the Olt through Teleorman and Argeș.
+
+### 1b. Make a cut line wander (`line`, `wander()`)
+
+A straight cut looks like a ruler's line. A cut with a `line` has its stretch of edge along that line replaced by a
+natural wobble: points every 0.02°, pushed sideways by three waves (0.6°, 0.23° and 0.09° long, 0.06°, 0.025° and
+0.012° high, about 6 km at most), faded to nothing at the stretch's ends where it meets the unit's own border.
+
+- The push depends only on the position along the line, and the points are generated in one direction and reversed
+  for the other half, so both halves of a unit get the very same points and still merge.
+- The waves' phases come from the line's own coordinates: each line wanders its own way, the same on every build.
+- Tune the amplitudes in `wander()`; keep the largest under ~0.08° or it can reach past a narrow unit's far border.
 
 ### 2. Merge units into shapes
 
@@ -92,12 +117,28 @@ g.coordinates[0][0].forEach((p, i) => { if (p[0] > 28.5 && p[0] < 29.5 && p[1] >
 A real lake fully inside the land (a hole) needs no notch entry: step 5 removes it if it is small, and a big one can be
 removed by filtering interior rings (see Tuning).
 
+### 3b. Soft zones (`ZONES`): lands with no known border
+
+Burebista's kingdom and its neighbours have no border to build from units. A zone is a hand-placed ring of [lon, lat]
+points (`points`), or several rings (`parts`: the Roman Republic on both sides of the Adriatic), rounded off by three
+passes of Chaikin's corner cutting (`chaikin()`). Each part is turned the right way round on its own (step 4). The app
+draws a zone with a blurred edge and no line (an SVG filter: erode, then Gaussian blur), so the exact ring matters
+little: place the points along the usual description and check a few known places fall inside (`geoContains`).
+
+### 3c. Merged shapes not shown as provinces (`MERGED`)
+
+For a land drawn as one piece where the moments don't join it themselves: `bessarabia-all` (Bessarabia with the
+Budjak), for the lands taken in 1812 and 1940. Unlike `COMBINED` (Transylvania, Bukovina), these are not joined into
+any state's `provinces`.
+
 ### 4. Winding: keep d3-geo's inside on the inside
 
 d3-geo works on the sphere: a ring's direction decides which side is inside. A shape whose area comes out bigger than a
 hemisphere (`geoArea(g) > 2π`) is wound the wrong way and would fill the whole world except itself. `rightWayRound()`
 reverses its rings. Run it after every merge (the script does, inside `merged()`), and check any hand-made polygon the
-same way.
+same way. It handles both a `Polygon` (reverse each ring) and a `MultiPolygon` (each polygon's rings): an earlier
+version treated every shape as a MultiPolygon, which on a single Polygon reversed each *point*, swapping longitude and
+latitude.
 
 ### 5. Drop small rings
 

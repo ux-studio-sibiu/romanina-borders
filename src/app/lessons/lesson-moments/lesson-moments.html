@@ -1,7 +1,7 @@
 <!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
 <app-lesson-page eyebrow="Lesson 03">
   <h1>The moments</h1>
-  <p>The story's words: thirteen moments, from the Dacians to today, each a sentence or two a 7-to-10-year-old can read aloud. They live in one content file, <code>data/moments.ts</code>, next to each moment's map (lesson 05), and <a routerLink="/">the map page</a> tells them under the map. (Lesson 04 and 05 came first: the tool and the shapes, so the shapes could be built while the story was written.)</p>
+  <p>The story's words: fourteen moments, from the Dacians to today, each a sentence or two a 7-to-10-year-old can read aloud. They live in one content file, <code>data/moments.ts</code>, next to each moment's map (lesson 05), and <a routerLink="/">the map page</a> tells them under the map. (Lesson 04 and 05 came first: the tool and the shapes, so the shapes could be built while the story was written.)</p>
 
   <h2>1. The moments, as a child reads them</h2>
   <ol class="moments">
@@ -13,7 +13,7 @@
         </div>
         <h3 class="title">{{ m.title }}</h3>
         <p class="text">{{ m.text }}</p>
-        <p class="meta">icon: {{ m.icon }} · map: {{ m.state ?? (m.status === 'trace' ? 'to trace' : 'arrows') }}</p>
+        <p class="meta">icon: {{ m.icon }} · map: {{ m.state ?? m.zone ?? (m.status === 'trace' ? 'to trace' : 'arrows') }}</p>
       </li>
     }
   </ol>
@@ -50,6 +50,7 @@
       <tr><td>Independence</td><td>Declared 9 May 1877, won in the war of 1877–78, recognised at the Congress of Berlin, 1878, which also gave Romania northern Dobruja and its coast.</td></tr>
       <tr><td>The Great Union</td><td>Bessarabia voted in March/April 1918, Bukovina in November, Transylvania at Alba Iulia on 1 December 1918, Romania's national day since 1990.</td></tr>
       <tr><td>1940</td><td>Bessarabia and northern Bukovina to the Soviet Union (June), northern Transylvania to Hungary (August), Southern Dobruja to Bulgaria (September); northern Transylvania returned to Romania after the war (Paris peace treaty, 1947).</td></tr>
+      <tr><td>1947</td><td>Northern Transylvania back in Romania in 1944–45, confirmed by the Paris peace treaty of February 1947; Bessarabia and northern Bukovina stayed with the Soviet Union, Southern Dobruja with Bulgaria. Romania's borders since.</td></tr>
       <tr><td>Today</td><td>The revolution of December 1989 ended communist rule; Romania joined the European Union on 1 January 2007; the Republic of Moldova has been independent since 1991.</td></tr>
     </tbody>
   </table>

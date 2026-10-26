@@ -13,6 +13,9 @@
 .controls, .caption { position: absolute; left: 16px; z-index: 1; padding: 10px 12px; @include paper.panel(6px); }
 .controls { top: 16px; max-width: min(560px, calc(100% - 32px)); }
 .caption { bottom: 16px; max-width: min(520px, calc(100% - 32px)); }
+// Lesson 07: the time scale, along the bottom right of the caption, where there is room for it (a wide window)
+.scale { position: absolute; right: 16px; bottom: 16px; left: calc(16px + min(520px, 100% - 32px) + 16px); z-index: 1; @include paper.panel(6px); }
+@media (width < 1100px) { .scale { display: none; } }
 
 // A shape's status, one colour each: on the timeline's bars, the key, the moment's tag and the map's placeholder
 [data-status] { --status: var(--muted); }
@@ -39,12 +42,14 @@
 .bar { width: 18px; height: 5px; background: var(--status); }
 
 // No shape yet: a tag in the middle of the map
+// Arrows, or a trace to come: the tag says so, in the working notes only
 .no-shape {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: 8px 14px;
   border: 2px solid var(--status); background: var(--surface); color: var(--status);
   @include paper.mono-label(0.75rem, 0.12em); font-weight: 700;
 }
 
+.heading { display: flex; align-items: center; gap: 10px; }
 .state-name { margin: 0; font-weight: 700; }
 .status { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--status); color: var(--status); @include paper.mono-label(0.625rem, 0.08em); font-weight: 700; vertical-align: 2px; }
 .note { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
@@ -55,5 +60,7 @@
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 0.9rem; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .swatch { width: 14px; height: 14px; border: 1px solid var(--ink); }
-// An empire's swatch: its hatch, as on the map
-.swatch.hatch { border: 1.5px dashed var(--empire); background: repeating-linear-gradient(45deg, var(--empire) 0 1.5px, transparent 1.5px 5px); }
+// A soft zone: its colour fading out, as on the map
+.swatch.soft { border: none; background: radial-gradient(circle, var(--zone) 35%, transparent 75%); }
+.swatch.soft.is-faint { opacity: 0.55; }
+

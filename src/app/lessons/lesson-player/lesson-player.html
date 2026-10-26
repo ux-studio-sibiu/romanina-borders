@@ -1,0 +1,61 @@
+<!-- Literal @ and { } start Angular syntax: escape them (&#64;, &#123;). -->
+<app-lesson-page eyebrow="Lesson 06">
+  <h1>The player</h1>
+  <p>Choosing a moment changes <a routerLink="/">the map</a> at once, and nothing on it moves: what the new moment adds is there, what it loses is gone, and everything the two moments share stays exactly where it was. The moment's icon pops up beside its title, and the peoples passing through cross the map as arrows. Navigation (Back and Next, keys, swipes) is the next lesson.</p>
+
+  <h2>1. Still pictures, not an animation</h2>
+  <ul>
+    <li>Each moment is a page of the picture book: the map at that time, still. Going to the next one, the map's loops track every province, empire and border by its id, so a province both moments have keeps its very element and isn't redrawn: Wallachia stays put from 1330 to today, and only what changed appears or goes.</li>
+    <li>Two livelier versions were tried and dropped. A <strong>morph</strong>, the border flowing from one shape into the next (both outlines resampled to the same number of points and blended, flubber's trick), looked odd: a border sliding across mountains it never crossed, through shapes no country ever had. Then <strong>flashes</strong>, the new parts blinking a few times: still too much for a child's map. The plain change reads best.</li>
+  </ul>
+
+  <h2>2. Icons</h2>
+  <ul>
+    <li>Each moment's icon (lesson 03 named them) is drawn as a small picture-book SVG, 48 × 48: bold ink outlines and flat colours, the same few colours as the map. The Dacian wolf-banner, the Roman eagle, a horse, a crown, a castle, a shield, a sword, a map, two rings becoming one, Romania's tricolour, a storm, the EU's star (<code>charts/moment-icon</code>).</li>
+    <li>It pops in beside the moment's title: it grows from nothing a little past its size and settles (an overshooting curve, <code>cubic-bezier(0.34, 1.56, 0.64, 1)</code>). The caption makes a new icon for each moment, so it pops every time.</li>
+  </ul>
+
+  <h2>3. Arrows for the peoples passing through</h2>
+  <ul>
+    <li>271–1000 has no borders to show, only movement. Its moment zooms out to the steppe and lists six routes (Goths, Huns, Slavs, Avars, Bulgars, Magyars), each a few waypoints from where they came from to where they went on to, with roughly when. Drawn as fat white arrows outlined in black (a smooth Catmull–Rom curve, thin at the tail and widening to a big head), the way a historical atlas draws them. They draw on one after another, by year (a mask: a wide stroke along each arrow's middle line, its dash offset animated), hold, fade and start again.</li>
+    <li>Each is a bold curve through its middle point (a quadratic whose control point is set to pass through it), on a white halo, with an arrowhead along its last direction and the people's name at the middle.</li>
+  </ul>
+
+  <h2>4. Lands taken</h2>
+  <ul>
+    <li>When a moment takes land away, the map shows it where it was: a dotted ink edge on a white backing, over the veil, with the land's name and, under it, who took it. 1775–1812: Bukovina "to Austria, 1775" and Bessarabia "to Russia, 1812"; 1940: Bessarabia and northern Bukovina to the Soviet Union, northern Transylvania to Hungary, Southern Dobruja to Bulgaria. The map names them, so the caption's key leaves them out: it keeps only what the map doesn't name (Burebista's kingdom drawn faint under Roman Dacia, the European Union's blue).</li>
+    <li>A moment lists them in <code>data/moments.ts</code> (<code>lost</code>: a block and who took it). Bessarabia is drawn as one piece with the Budjak (a merged shape, <code>bessarabia-all</code>), as it was taken; the empire names that sat on those lands moved aside so the two labels don't overlap.</li>
+  </ul>
+
+  <h2>5. Zooming out: a moment's own view</h2>
+  <ul>
+    <li>A moment can name its own <strong>view</strong>, a [lon, lat] box the map fits instead of the usual core (<code>view</code> in <code>data/moments.ts</code>). c. 60 BC uses it to zoom out, from the Adriatic to the Don and from Greece to Galicia, so Burebista's kingdom shows among its neighbours.</li>
+    <li>Past the detailed area the map switches to the <strong>wide data</strong>: the same layers over a bigger extent (45° W–68° E, 20°–80° N, <code>wide</code> in <code>region.json</code>): all of Europe, for 2007's European Union (drawn plain, without the picture: blue water, paper land, no rivers, today's 27 members named, Romania picked out by its border), and big enough that every zoomed-out view fills a landscape screen to its corners. Every country is one shape, simplified hard (it is only seen from far away), and the satellite picture covers only the Roman world round the Black Sea that the ancient moments show (0°–55° E, 33°–57° N, <code>wideSatellite</code>: <code>npm run data:wide</code>, <code>geography-wide.topo.json</code>, 134 kB, and <code>satellite-wide.webp</code>). It is fetched only when needed: the first time a moment needs it, or a moment earlier, when the pointer or the keyboard reaches a zoomed-out moment's button (not for a browser that asks to save data).</li>
+    <li>The <strong>neighbours</strong> are soft zones like Burebista's, hand-placed and rounded off, with a lighter fade so the small ones (the Scordisci, the Bosporan kingdom) don't blur away: the Roman Republic round the Adriatic and the Aegean (one shape, the seas inside), the Celts (the Boii and the Scordisci, one zone of two overlapping rings), the Thracians, the Bastarnae, the Sarmatians, the Scythians and the Bosporan kingdom (<code>neighbours</code>). With neighbours to show, the map leaves the veil off.</li>
+    <li><strong>Places</strong>, a dot and a name each: Sarmizegetusa and the Greek cities on the coast, from Histria and Tomis to Olbia and Byzantion (<code>places</code>). The start of the places layer: any moment can list some.</li>
+    <li>Any other moment can use the same three: a <code>view</code>, <code>neighbours</code> and <code>places</code>.</li>
+    <li><strong>Zooming between views.</strong> Every view uses the same projection, only scaled and moved to fit, so going from one view to the next is an exact scale and pan of the whole picture. The map draws the new moment once, at its final place, and the whole <code>&lt;svg&gt;</code> is scaled as one picture: it starts looking like the old view and eases back to no transform over 1.3 s. It is a CSS transform on a layer the browser paints once (<code>will-change: transform</code>) and scales on the graphics card, run as a Web Animation, so it plays on the compositor thread: nothing is repainted while it moves, not the borders, the hatching or the blurred zones. (A first version moved an SVG group frame by frame; the browser repainted everything sixty times a second, and it crawled.) The scale is eased geometrically, about the one point that stays still, sampled 40 times, so the zoom feels even. The drawings cross-fade as it moves: a copy of the old ones fades out by the middle while the new fade in, each a Web Animation that leaves nothing behind. Nothing about the layer changes as the zoom ends (it stays a layer, its clip stays the same): when it did, the browser repainted the whole map from scratch, and the European Union showed a blank frame. Zooming in from the wide data, the wide picture stays underneath, drawn past the map's own box, so the edges aren't blank on the way; the wide data is fetched as the pointer reaches a zoomed-out moment's button. Zooming out starts from the zoomed-out picture enlarged, so it is a touch soft for a moment. Moments that share a view change at once, as before; with reduced motion, every change is instant.</li>
+  </ul>
+
+  <h2>6. Less motion</h2>
+  <p>The only animation is the icon's pop; a visitor whose system asks for reduced motion (<code>prefers-reduced-motion</code>) doesn't get that either.</p>
+
+  <h2>Files in this lesson</h2>
+  <ul class="note">
+    <li><code>charts/region-map/*</code>: the arrows (<code>arrows</code> input)</li>
+    <li><code>charts/moment-icon/*</code>: the twelve icons</li>
+    <li><code>scripts/build-geography.mjs --wide</code>, <code>build-satellite.mjs --wide</code> (<code>npm run data:wide</code>); <code>data/region.json</code>: the wide extent; <code>data/geography.ts</code>: the wide data, loaded on demand</li>
+    <li><code>charts/moments-map/*</code>: the icon in the caption, the moment's arrows to the map; <code>data/moments.ts</code>: the routes</li>
+    <li><code>lessons/lesson-player/*</code> (this page), <code>lessons.routes.ts</code></li>
+  </ul>
+
+  <h2>Review checklist</h2>
+  <ul class="note">
+    <li><a routerLink="/">The map</a>: 1859 → 1877–78: Dobruja and the new border appear; Wallachia and Moldavia don't move</li>
+    <li>Every moment: its icon pops in beside the title</li>
+    <li>271–1000: six arrows, each with its name</li>
+    <li>1775–1812 and 1940: the lands taken have a dotted edge, their name and who took them</li>
+    <li>c. 60 BC: the map zooms out; Burebista's kingdom among its neighbours, the Greek cities on the coast</li>
+    <li>With reduced motion turned on in the system: the icon appears without its pop</li>
+  </ul>
+</app-lesson-page>

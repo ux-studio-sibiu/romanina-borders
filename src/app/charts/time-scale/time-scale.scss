@@ -1,0 +1,55 @@
+@use '../../../styles/paper' as paper;
+
+:host { display: block; }
+
+// A play button, then a line across the panel, the moments' dots on it, their years above and below by turns, and the
+// triangle over the line
+.nsc-time-scale {
+  display: flex; align-items: center; gap: 24px;
+  padding: 44px 28px 32px 16px; user-select: none;
+
+  // Play and pause: a square ink button left of the line
+  .play {
+    flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid var(--ink); border-radius: 0;
+    background: var(--surface); color: var(--ink); cursor: pointer;
+    svg { width: 14px; height: 14px; fill: currentColor; }
+    &:hover { background: var(--tint); }
+    &.is-playing { background: var(--ink); color: var(--surface); }
+  }
+
+  .track { position: relative; flex: 1; height: 12px; }
+  .line { position: absolute; top: 5px; left: 0; right: 0; height: 2px; background: var(--ink); }
+
+  .stop {
+    position: absolute; bottom: 0; transform: translateX(-50%); padding: 0; border: 0; background: none; cursor: pointer;
+    display: flex; flex-direction: column-reverse; align-items: center; gap: 16px; // room for the triangle above the dot
+    color: var(--fg); font: inherit;
+
+    .dot { width: 12px; height: 12px; border: 2px solid var(--ink); border-radius: 50%; background: var(--surface); }
+    .year { white-space: nowrap; @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
+    &:hover .dot { background: var(--tint); }
+    &.is-active .dot { background: var(--ink); transform: scale(1.35); }
+    &.is-active .year { padding: 1px 4px; background: var(--ink); color: var(--surface); }
+    // A moment that zooms, under the triangle while dragging: shown on letting go
+    &.is-waiting .dot { background: var(--tint); transform: scale(1.35); }
+    &.is-waiting .year { padding: 0 3px; border: 1px dashed var(--ink); }
+  }
+  // Every other moment's year below the line, so neighbours don't collide
+  .stop.is-below { top: 0; bottom: auto; flex-direction: column; gap: 3px; }
+
+  // The slider: an ink triangle pointing down at the line, resting wherever it is left; it glides to a moment chosen
+  // elsewhere, and follows the pointer, or play, straight
+  // The box is bigger than the triangle drawn in it, so it is easy to grab
+  .handle {
+    position: absolute; top: -15px; width: 30px; height: 20px; transform: translateX(-50%); z-index: 1; touch-action: none;
+    cursor: grab; transition: left 0.25s ease;
+    &::after {
+      content: ''; position: absolute; left: 6px; bottom: 0; width: 18px; height: 13px;
+      background: var(--ink); clip-path: polygon(0 0, 100% 0, 50% 100%);
+    }
+    &:focus-visible { outline: none; &::after { background: var(--accent); } } // a ring would be clipped off with the corners
+  }
+  &.is-dragging { cursor: grabbing; }
+  &.is-dragging .handle { cursor: grabbing; transition: none; }
+  &.is-playing .handle { transition: none; }
+}

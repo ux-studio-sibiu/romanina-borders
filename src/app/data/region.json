@@ -1,5 +1,5 @@
 {
-  "//": "The map's geometry, in one place: read by the app (charts/region-map) and by the build scripts (scripts/build-geography.mjs, build-satellite.mjs), so they always agree. core: the story's lands, always fully on screen. area: the core and about a fifth more on every side, the data's extent and what a full-bleed window shows. projection: Lambert conformal conic. All in [lon, lat] degrees.",
+  "//": "The map's geometry, in one place: read by the app (charts/region-map) and by the build scripts (scripts/build-geography.mjs, build-satellite.mjs), so they always agree. core: the story's lands, always fully on screen. area: the core and about a fifth more on every side (a third more east and west, for wide laptop screens up to about 2.4:1), the detailed data's extent and what a full-bleed window shows. wide: the extent of the simpler wide data (from the Atlantic to the Caspian, the North Cape to the Sahara's edge: enough for the European Union of 2007, drawn plain, and every landscape screen) (one shape per country), for moments that zoom out to show their neighbours (a moment's view). wideSatellite: the smaller extent of the wide satellite picture, the Roman world round the Black Sea that the zoomed-out ancient moments show (0° E is the NASA tile's own west edge). projection: Lambert conformal conic. All in [lon, lat] degrees.",
   "core": [
     [
       20,
@@ -12,12 +12,32 @@
   ],
   "area": [
     [
-      16.5,
+      14.5,
       41.2
     ],
     [
-      34,
+      36,
       50.2
+    ]
+  ],
+  "wide": [
+    [
+      -45,
+      20
+    ],
+    [
+      68,
+      80
+    ]
+  ],
+  "wideSatellite": [
+    [
+      0,
+      33
+    ],
+    [
+      55,
+      57
     ]
   ],
   "projection": {

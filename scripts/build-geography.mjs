@@ -3,6 +3,8 @@
 //   npm run data:geography -- --fresh (downloads again)
 //
 // Natural Earth 1:10m (public domain): admin-1 units, rivers, the Black Sea → public/data/geography.topo.json
+//   npm run data:geography:wide       the wide data (--wide): the bigger extent `wide` in region.json, every country one
+//                                     shape, simplified more → public/data/geography-wide.topo.json (lesson 06's views)
 // Runs in Node, at build time, never in the browser. The output is committed, so the app never depends on a third-party server.
 // Modelled on data-viz's scripts/build-boundaries.mjs.
 
@@ -13,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { geoBounds } from 'd3-geo';
 import { feature, mergeArcs, quantize } from 'topojson-client';
 import { topology } from 'topojson-server';
-import { presimplify, simplify } from 'topojson-simplify';
+import { filter, filterWeight, presimplify, simplify } from 'topojson-simplify';
 
 const VERSION = 'v5.1.2'; // pinned: the same input always gives the same output
 const BASE = `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/${VERSION}/geojson`;
@@ -27,8 +29,11 @@ const FILES = {
 // The map's area (src/app/data/region.json, shared with the app): the story's core and about a fifth more on every side,
 // so a full-screen map has land to its edges. Its edges are meridians and parallels, so in [lon, lat] it is exactly this
 // box. Anything touching it is kept, whole: a unit cut at the edge would be useless for merging later.
-const REGION = JSON.parse(await readFile(new URL('../src/app/data/region.json', import.meta.url), 'utf8')).area;
-const COUNTRIES = ['ROU', 'MDA', 'UKR', 'BGR', 'HUN', 'SRB']; // admin-1 units kept as units; every other country is merged into one shape
+const WIDE = process.argv.includes('--wide');
+const region = JSON.parse(await readFile(new URL('../src/app/data/region.json', import.meta.url), 'utf8'));
+const REGION = WIDE ? region.wide : region.area;
+// Admin-1 units kept as units; every other country is merged into one shape. The wide data keeps none: one shape per country.
+const COUNTRIES = WIDE ? [] : ['ROU', 'MDA', 'UKR', 'BGR', 'HUN', 'SRB'];
 
 // The six rivers, by their Natural Earth names. The Danube includes its delta branches (and the Borcea, a branch above the delta).
 const RIVERS = [
@@ -43,7 +48,10 @@ const RIVERS = [
 // Weights are planar triangle areas in square degrees. At ~1000 px for the frame's 10.5°, a pixel is ~0.01°: a corner that adds
 // less than a 0.003° × 0.003° triangle (≈ 0.1 px²) can't be seen. No smoothing (data-viz's Chaikin pass): these lines are
 // snapping targets, so every point kept is a real Natural Earth point.
-const MIN_WEIGHT = 1e-5;
+// The wide data is only ever seen zoomed out (a fifth of the scale or less): far coarser, and its islets go (rings under
+// MIN_RING square degrees, about 200 km²: Malta, 316 km², stays)
+const MIN_WEIGHT = WIDE ? 1e-2 : 1e-5;
+const MIN_RING = WIDE ? 0.02 : 0;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cacheDir = join(root, 'scripts/.cache');
@@ -118,17 +126,20 @@ topo.objects.neighbours.geometries = [...byCountry].map(([id, geometries]) => ({
 // Simplify (Visvalingam, planar: the region is small enough for flat areas). Arc endpoints are always kept, so the points where
 // three units meet, or a border meets the coast, never move.
 const before = topo.arcs.reduce((n, a) => n + a.length, 0);
+if (MIN_RING) topo = filter(topo, filterWeight(topo, MIN_RING));
+// filter() leaves an empty collection (the wide data's units) with no type: put it back, the app reads every object
+for (const o of Object.values(topo.objects)) if (!o.geometries) Object.assign(o, { type: 'GeometryCollection', geometries: [] });
 topo = simplify(presimplify(topo), MIN_WEIGHT);
 
 // Quantize last: snap coordinates to a 100 000 × 100 000 grid over the bounding box (about 17° × 11°, so ~15 m)
 // and store each point as a small integer delta from the previous one
-topo = quantize(topo, 1e5);
+topo = quantize(topo, WIDE ? 2e4 : 1e5);
 topo.source = { name: 'Natural Earth 1:10m', version: VERSION, files: Object.values(FILES), url: 'https://www.naturalearthdata.com/', license: 'Public domain' };
 
 // --- 5. Write -----------------------------------------------------------------------------------
 await mkdir(outDir, { recursive: true });
 const json = JSON.stringify(topo);
-await writeFile(join(outDir, 'geography.topo.json'), json);
+await writeFile(join(outDir, WIDE ? 'geography-wide.topo.json' : 'geography.topo.json'), json);
 
 // --- 6. Report ----------------------------------------------------------------------------------
 const kb = s => `${(Buffer.byteLength(s) / 1024).toFixed(0)} kB`;
@@ -141,8 +152,10 @@ console.log(`Points:      ${before} → ${topo.arcs.reduce((n, a) => n + a.lengt
 console.log(`Arcs:        ${topo.arcs.length}`);
 console.log(`Size:        ${kb(json)}`);
 
-// Sanity check: every unit and river survived simplification as a real shape
+// Sanity check: every unit and river survived simplification as a real shape. In the wide data the microstates go with
+// the islets (San Marino, the Vatican, Monaco, Liechtenstein): listed, not an error.
 for (const name of ['units', 'neighbours', 'rivers', 'sea']) {
-  const empty = feature(topo, topo.objects[name]).features.filter(f => !f.geometry);
-  if (empty.length) throw new Error(`${name}: ${empty.length} features lost their geometry`);
+  const empty = (feature(topo, topo.objects[name]).features ?? []).filter(f => !f.geometry);
+  if (empty.length && WIDE && name === 'neighbours') console.log(`Dropped:     ${empty.map(f => f.id).join(' ')}`);
+  else if (empty.length) throw new Error(`${name}: ${empty.length} features lost their geometry`);
 }

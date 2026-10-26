@@ -8,5 +8,6 @@ export const lessonRoutes: Routes = [
   { path: 'satellite', loadComponent: () => import('./lesson-satellite/lesson-satellite').then(m => m.LessonSatellite), title: '02 Satellite backdrop' },
   { path: 'moments', loadComponent: () => import('./lesson-moments/lesson-moments').then(m => m.LessonMoments), title: '03 The moments' },
   { path: 'trace', loadComponent: () => import('./lesson-trace/lesson-trace').then(m => m.LessonTrace), title: '04 A simple trace tool' },
-  { path: 'shapes', loadComponent: () => import('./lesson-shapes/lesson-shapes').then(m => m.LessonShapes), title: '05 The map shapes' }
+  { path: 'shapes', loadComponent: () => import('./lesson-shapes/lesson-shapes').then(m => m.LessonShapes), title: '05 The map shapes' },
+  { path: 'player', loadComponent: () => import('./lesson-player/lesson-player').then(m => m.LessonPlayer), title: '06 The player' }
 ];

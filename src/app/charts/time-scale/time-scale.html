@@ -1,0 +1,24 @@
+<!-- Lesson 07: a play button, then the moments along a time scale, a dot each (above or below by turns, so the years
+     don't collide), and a triangle over the line that rests anywhere; the map shows the moment on its left. Click a dot
+     for its moment; only the triangle drags. -->
+<div class="nsc-time-scale" [class.is-dragging]="dragging()" [class.is-playing]="playing()" role="group" aria-label="Moments in time">
+  <button type="button" class="play" [class.is-playing]="playing()" [attr.aria-label]="playing() ? 'Pause' : 'Play through time'" (click)="togglePlay()">
+    @if (playing()) {
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
+    } @else {
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2 L14 8 L4 14 Z" /></svg>
+    }
+  </button>
+  <div class="track" #track>
+    <div class="line"></div>
+    @for (s of stops(); track s.moment.id) {
+      <button type="button" class="stop" [class.is-below]="s.below" [class.is-active]="s.moment.id === activeId()" [class.is-waiting]="s.moment.id === waiting()?.id" [style.left.%]="s.x * 100"
+              [attr.aria-pressed]="s.moment.id === activeId()" [title]="s.moment.title" tabindex="-1" (click)="clickStop(s.moment)">
+        <span class="dot"></span><span class="year">{{ s.moment.label }}</span>
+      </button>
+    }
+    <div class="handle" [style.left.%]="position() * 100" tabindex="0" role="slider" aria-label="Moment" [attr.aria-valuemin]="0" [attr.aria-valuemax]="moments().length - 1"
+         [attr.aria-valuenow]="activeIndex()" [attr.aria-valuetext]="moments()[activeIndex()]?.label" (keydown)="key($event)"
+         (pointerdown)="down($event)" (pointermove)="move($event)" (pointerup)="up()" (pointercancel)="up()"></div>
+  </div>
+</div>

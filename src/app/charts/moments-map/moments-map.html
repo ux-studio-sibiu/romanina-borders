@@ -1,6 +1,8 @@
-<div class="nsc-moments-map">
-  <app-region-map [geography]="geography.base()" [territories]="territories()" [focus]="state() ?? null" label="The lands at the chosen moment" />
-  @if (!moment().state) {
+<div class="nsc-moments-map" (wheel)="scroll($event)">
+  <!-- The veil is left off when neighbours are shown: they are the point of the view -->
+  <app-region-map [geography]="map()" [territories]="territories()" [focus]="neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
+                  [arrows]="arrows()" [nameAt]="namePlaces" [arrowYear]="scaleYear()" [places]="places()" [view]="view()" [wide]="wide()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
+  @if (!moment().state && !moment().zone) {
     @if (details()) { <p class="no-shape" [attr.data-status]="moment().status">{{ moment().status === 'trace' ? 'To trace' : 'Arrows, in the player' }}</p> }
   }
 
@@ -10,7 +12,7 @@
     <ol class="timeline" aria-label="Moments">
       @for (m of timeline; track m.id) {
         <li>
-          <button type="button" [class.is-active]="m.id === momentId()" [attr.data-status]="details() ? m.status : null" [attr.aria-pressed]="m.id === momentId()" (click)="momentId.set(m.id)" [title]="details() ? m.title + ': ' + statusText[m.status] : m.title">{{ m.label }}</button>
+          <button type="button" [class.is-active]="m.id === momentId()" [attr.data-status]="details() ? m.status : null" [attr.aria-pressed]="m.id === momentId()" (click)="choose(m)" (pointerenter)="prepare(m)" (focus)="prepare(m)" [title]="details() ? m.title + ': ' + statusText[m.status] : m.title">{{ m.label }}</button>
         </li>
       }
     </ol>
@@ -21,19 +23,30 @@
     }
   </div>
 
+  <!-- Lesson 07: the moments on a time scale, roughly in proportion to their years (an experiment, beside the buttons) -->
+  @if (scale()) { <app-time-scale class="scale" [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" (scrubbed)="scaleYear.set($event)" /> }
+
   @let m = moment();
   <div class="caption" aria-live="polite">
-    <p class="state-name">{{ m.label }}: {{ m.title }} @if (details()) { <span class="status" [attr.data-status]="m.status">{{ statusText[m.status] }}</span> }</p>
+    <!-- The moment's icon pops in beside its title (one element per moment, so it pops again for the next) -->
+    <div class="heading">
+      @for (one of [m]; track one.id) { <app-moment-icon [icon]="one.icon" /> }
+      <p class="state-name">{{ m.label }}: {{ m.title }} @if (details()) { <span class="status" [attr.data-status]="m.status">{{ statusText[m.status] }}</span> }</p>
+    </div>
     @if (details()) {
       @if (m.note) { <p class="note">{{ m.note }}</p> }
     } @else {
       <p class="ago">{{ yearsAgo(m.year) }}</p>
       <p class="story">{{ m.text }}</p>
     }
-    @if (state() || empires().length) {
+    <!-- A key only for what the map doesn't name itself: the provinces, empires, peoples and lands taken all have their
+         names on the map. Left: Burebista's kingdom drawn faint and unnamed under a later state, and the European
+         Union's blue, whose countries are named but not what joins them. -->
+    @let faintZone = state() ? zone() : undefined;
+    @if (faintZone || countries().length) {
       <ul class="legend">
-        @for (b of blocks(); track b.id) { <li><span class="swatch" [style.background]="colour(b.id)"></span>{{ b.properties.name }}</li> }
-        @for (e of empires(); track e.id) { <li><span class="swatch hatch" [style.--empire]="empireColour(e.id)"></span>{{ e.properties.name }}</li> }
+        @if (faintZone; as z) { <li><span class="swatch soft is-faint" [style.--zone]="colour(z.id)"></span>{{ z.properties.name }}, roughly (before the Romans)</li> }
+        @if (countries().length) { <li><span class="swatch" [style.background]="euColour"></span>The European Union today</li> }
       </ul>
     }
   </div>
