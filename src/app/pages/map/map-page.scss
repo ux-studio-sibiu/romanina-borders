@@ -2,6 +2,6 @@
 .nsc-map-page {
   position: relative; height: 100dvh; overflow: hidden;
 
-  // In the timeline's panel, above the years (projected in, so styled here)
-  .title { margin: 0 0 8px; font-size: 1.1rem; }
+  // The page's title, for screen readers only: the map says it
+  .title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }

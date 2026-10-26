@@ -1,10 +1,9 @@
 <section class="nsc-map-page">
-  <!-- The map at a moment of the story, full screen, with the timeline and the moment's caption over it, without the
-       shapes' working notes (lesson 05 shows those), the scroll wheel stepping through the moments. The title goes at the
-       top of the timeline's panel. -->
-  <app-moments-map [details]="false" [scrollNav]="true" [scale]="true">
-    <h1 class="title">Romania's borders</h1>
-  </app-moments-map>
+  <!-- The map at a moment of the story, full screen, with the time scale and the moment's caption over it, without the
+       shapes' working notes (lesson 05 shows those), the scroll wheel stepping through the moments. The title is for
+       screen readers. -->
+  <h1 class="title">Romania's borders</h1>
+  <app-moments-map [details]="false" [scrollNav]="true" [scale]="true" />
 
   <!-- A dev tool for the satellite backdrop's look (Shift+T), left out of production builds: a look worth keeping is
        copied into BACKDROP_DEFAULTS (charts/region-map/backdrop-style.ts) -->

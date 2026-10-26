@@ -6,9 +6,17 @@
     @if (details()) { <p class="no-shape" [attr.data-status]="moment().status">{{ moment().status === 'trace' ? 'To trace' : 'Arrows, in the player' }}</p> }
   }
 
-  <!-- The title, if any, then every moment with its shape's status: a coloured bar under the year (see the key) -->
+  <!-- Lesson 07: the moments down a time scale, at the right, with their titles (folds to the years) -->
+  @if (scale()) {
+    <app-time-scale class="scale" [class.is-closed]="!scaleOpen()" [open]="scaleOpen()" (openChange)="setScaleOpen($event)"
+                    [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" (scrubbed)="scaleYear.set($event)" />
+  }
+
+  <!-- At the bottom left, one above the other: without the time scale (lesson 05), the moments' buttons; then the caption -->
+  <div class="side">
+  @if (!scale()) {
+  <!-- Every moment with its shape's status: a coloured bar under the year (see the key) -->
   <div class="controls">
-    <ng-content />
     <ol class="timeline" aria-label="Moments">
       @for (m of timeline; track m.id) {
         <li>
@@ -22,9 +30,7 @@
       </ul>
     }
   </div>
-
-  <!-- Lesson 07: the moments on a time scale, roughly in proportion to their years (an experiment, beside the buttons) -->
-  @if (scale()) { <app-time-scale class="scale" [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" (scrubbed)="scaleYear.set($event)" /> }
+  }
 
   @let m = moment();
   <div class="caption" aria-live="polite">
@@ -50,4 +56,6 @@
       </ul>
     }
   </div>
+  </div>
+
 </div>

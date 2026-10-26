@@ -19,9 +19,9 @@ const STATUS_TEXT: Record<ShapeStatus, string> = {
   arrows: 'No border: arrows in the player'
 };
 
-// Lesson 05: the map at a moment of the story, full bleed, with the timeline floating over its top and the moment's
-// caption over its bottom. Fills its parent (which must be positioned and sized). Used by the map page and lesson 05;
-// whatever is put inside it (a title) goes at the top of the timeline's panel. `details`: the shapes' working notes
+// Lesson 05: the map at a moment of the story, full bleed, with the moments' buttons and the moment's caption floating
+// over its bottom left (lesson 07: on the map page, a time scale down its right instead of the buttons). Fills its parent
+// (which must be positioned and sized). Used by the map page and lesson 05. `details`: the shapes' working notes
 // (each moment's status, the key, the notes on what to trace or adjust), for lesson 05; without them (the map page) the
 // caption tells the moment's story instead, for children (lesson 03).
 @Component({
@@ -131,6 +131,13 @@ export class MomentsMap {
     if (i >= 0 && i < MOMENTS.length) this.choose(MOMENTS[i]);
   }
 
+  // Lesson 07: whether the time scale is open (or folded to the years), kept across reloads
+  protected readonly scaleOpen = signal(readScaleOpen());
+  protected setScaleOpen(open: boolean) {
+    this.scaleOpen.set(open);
+    try { localStorage.setItem(SCALE_OPEN_KEY, String(open)); } catch { /* not kept: fine */ }
+  }
+
   // The names placed by hand (data/name-places.ts)
   protected readonly namePlaces = NAME_PLACES;
 
@@ -179,4 +186,10 @@ function decoded(src: string) {
     pictures.set(src, picture.decode().catch(() => undefined));
   }
   return pictures.get(src)!;
+}
+
+// Lesson 07: the time scale open or folded, open at first
+const SCALE_OPEN_KEY = 'romanianBorders.timeScaleOpen';
+function readScaleOpen() {
+  try { return localStorage.getItem(SCALE_OPEN_KEY) !== 'false'; } catch { return true; }
 }

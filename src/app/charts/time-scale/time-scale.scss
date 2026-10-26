@@ -2,50 +2,68 @@
 
 :host { display: block; }
 
-// A play button, then a line across the panel, the moments' dots on it, their years above and below by turns, and the
-// triangle over the line
+// The line is the panel's own left edge (set by the parent): everything is placed from it. The dots sit on it, the years,
+// titles and ticks to its right, the ear and the triangle outside it, to its left. Clear at the top (the header's links,
+// the ear) and the bottom.
 .nsc-time-scale {
-  display: flex; align-items: center; gap: 24px;
-  padding: 44px 28px 32px 16px; user-select: none;
+  position: relative; height: 100%; padding: 104px 16px 56px 0; user-select: none;
 
-  // Play and pause: a square ink button left of the line
-  .play {
-    flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid var(--ink); border-radius: 0;
-    background: var(--surface); color: var(--ink); cursor: pointer;
-    svg { width: 14px; height: 14px; fill: currentColor; }
-    &:hover { background: var(--tint); }
-    &.is-playing { background: var(--ink); color: var(--surface); }
+  // The ear: a black tab outside the top of the line (under the header's links), its white caret pointing the way the
+  // panel goes
+  .ear {
+    position: absolute; top: 44px; left: -28px; display: grid; place-items: center; width: 26px; height: 40px; padding: 0;
+    border: 0; border-radius: 0; background: var(--ink); color: #fff; cursor: pointer;
+    svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
+    &:hover { background: #333; }
   }
 
-  .track { position: relative; flex: 1; height: 12px; }
-  .line { position: absolute; top: 5px; left: 0; right: 0; height: 2px; background: var(--ink); }
+  .track { position: relative; height: 100%; }
 
+  // A moment: its dot centred on the line (1px left of the content edge, the line's middle), level with its years
   .stop {
-    position: absolute; bottom: 0; transform: translateX(-50%); padding: 0; border: 0; background: none; cursor: pointer;
-    display: flex; flex-direction: column-reverse; align-items: center; gap: 16px; // room for the triangle above the dot
-    color: var(--fg); font: inherit;
+    position: absolute; left: -7px; transform: translateY(-8px); display: flex; align-items: flex-start; gap: 10px; padding: 0;
+    border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer;
 
-    .dot { width: 12px; height: 12px; border: 2px solid var(--ink); border-radius: 50%; background: var(--surface); }
-    .year { white-space: nowrap; @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
+    .dot { flex: none; width: 12px; height: 12px; margin-top: 2px; border: 2px solid var(--ink); border-radius: 50%; background: var(--surface); }
+    .text { display: flex; flex-direction: column; gap: 1px; }
+    .year { width: max-content; line-height: 16px; @include paper.mono-label(0.8125rem, 0.04em); font-weight: 700; }
+    .title { max-width: 200px; overflow: hidden; font-size: 0.8rem; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
     &:hover .dot { background: var(--tint); }
     &.is-active .dot { background: var(--ink); transform: scale(1.35); }
-    &.is-active .year { padding: 1px 4px; background: var(--ink); color: var(--surface); }
+    &.is-active .year { padding: 0 4px; background: var(--ink); color: var(--surface); }
     // A moment that zooms, under the triangle while dragging: shown on letting go
     &.is-waiting .dot { background: var(--tint); transform: scale(1.35); }
     &.is-waiting .year { padding: 0 3px; border: 1px dashed var(--ink); }
   }
-  // Every other moment's year below the line, so neighbours don't collide
-  .stop.is-below { top: 0; bottom: auto; flex-direction: column; gap: 3px; }
 
-  // The slider: an ink triangle pointing down at the line, resting wherever it is left; it glides to a moment chosen
-  // elsewhere, and follows the pointer, or play, straight
-  // The box is bigger than the triangle drawn in it, so it is easy to grab
+  // A moment's own events: a short grey tick across the line, its year and name in grey beside it
+  .tick {
+    position: absolute; left: -5px; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding: 0;
+    border: 0; background: none; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
+    .mark { flex: none; width: 10px; height: 2px; background: var(--muted); }
+    .tick-year { @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
+    .tick-name { font-size: 0.75rem; }
+    &:hover { color: var(--fg); .mark { background: var(--fg); } }
+  }
+
+  // The small play, at the right of the chosen moment's row
+  .play {
+    position: absolute; right: 0; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+    border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); cursor: pointer;
+    svg { width: 10px; height: 10px; fill: currentColor; }
+    &:hover { background: var(--tint); }
+    &.is-playing { background: var(--ink); color: var(--surface); }
+  }
+
+  // The slider: an ink triangle outside the line, pointing at it, resting wherever it is left; it glides to a moment
+  // chosen elsewhere, and follows the pointer, or play, straight. The box is bigger than the triangle drawn in it, so it
+  // is easy to grab.
   .handle {
-    position: absolute; top: -15px; width: 30px; height: 20px; transform: translateX(-50%); z-index: 1; touch-action: none;
-    cursor: grab; transition: left 0.25s ease;
+    position: absolute; top: 0; left: -34px; z-index: 1; width: 24px; height: 26px; transform: translateY(-50%); touch-action: none;
+    cursor: grab; transition: top 0.25s ease;
     &::after {
-      content: ''; position: absolute; left: 6px; bottom: 0; width: 18px; height: 13px;
-      background: var(--ink); clip-path: polygon(0 0, 100% 0, 50% 100%);
+      content: ''; position: absolute; right: 4px; top: 4px; width: 14px; height: 18px;
+      background: var(--ink); clip-path: polygon(0 0, 100% 50%, 0 100%);
     }
     &:focus-visible { outline: none; &::after { background: var(--accent); } } // a ring would be clipped off with the corners
   }

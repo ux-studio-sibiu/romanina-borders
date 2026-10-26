@@ -9,13 +9,17 @@
   app-region-map { position: absolute; inset: 0; }
 }
 
-// The two panels: paper, an ink edge, the hatched lift; above the map, out of its way in the corners
-.controls, .caption { position: absolute; left: 16px; z-index: 1; padding: 10px 12px; @include paper.panel(6px); }
-.controls { top: 16px; max-width: min(560px, calc(100% - 32px)); }
-.caption { bottom: 16px; max-width: min(520px, calc(100% - 32px)); }
-// Lesson 07: the time scale, along the bottom right of the caption, where there is room for it (a wide window)
-.scale { position: absolute; right: 16px; bottom: 16px; left: calc(16px + min(520px, 100% - 32px) + 16px); z-index: 1; @include paper.panel(6px); }
-@media (width < 1100px) { .scale { display: none; } }
+// The panels: paper, an ink edge, the hatched lift; above the map, out of its way at its edges. At the bottom left, one
+// above the other, the moments' buttons (lesson 05) and the caption; down the right, the time scale (lesson 07).
+.side { position: absolute; left: 16px; bottom: 16px; z-index: 1; display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: min(520px, calc(100% - 32px)); }
+.controls, .caption { padding: 10px 12px; @include paper.panel(6px); }
+
+// Lesson 07: the time scale, a strip down the whole right edge, top to bottom (narrower folded): paper with an ink edge on
+// its left (the line itself), no lift; its top kept clear for the header's links. Hidden on a narrow window, where the
+// caption takes the width.
+.scale { position: absolute; top: 0; bottom: 0; right: 0; z-index: 1; width: 300px; border-left: 2px solid var(--ink); background: var(--surface); }
+.scale.is-closed { width: 150px; } // the widest years (1775–1812) on one line, with room to spare
+@media (width < 760px) { .scale { display: none; } }
 
 // A shape's status, one colour each: on the timeline's bars, the key, the moment's tag and the map's placeholder
 [data-status] { --status: var(--muted); }

@@ -1,23 +1,34 @@
-<!-- Lesson 07: a play button, then the moments along a time scale, a dot each (above or below by turns, so the years
-     don't collide), and a triangle over the line that rests anywhere; the map shows the moment on its left. Click a dot
-     for its moment; only the triangle drags. -->
-<div class="nsc-time-scale" [class.is-dragging]="dragging()" [class.is-playing]="playing()" role="group" aria-label="Moments in time">
-  <button type="button" class="play" [class.is-playing]="playing()" [attr.aria-label]="playing() ? 'Pause' : 'Play through time'" (click)="togglePlay()">
-    @if (playing()) {
-      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
-    } @else {
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2 L14 8 L4 14 Z" /></svg>
-    }
+<!-- Lesson 07: the moments down a time scale, the line being the panel's left edge: a dot each on it, its years level with
+     the dot and its title under them; while a moment with dated events is chosen, their grey ticks and a small play; the
+     triangle outside the line, resting anywhere (the map shows the moment before it). Click a dot for its moment; only the
+     triangle drags. The ear, top left outside the line, folds it to the years and opens it again. -->
+<div class="nsc-time-scale" [class.is-closed]="!open()" [class.is-dragging]="dragging()" [class.is-playing]="playing()" role="group" aria-label="Moments in time">
+  <button type="button" class="ear" [attr.aria-expanded]="open()" [attr.aria-label]="open() ? 'Fold the time scale' : 'Open the time scale'" (click)="openChange.emit(!open())">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path [attr.d]="open() ? 'M6 3 L11 8 L6 13' : 'M10 3 L5 8 L10 13'" /></svg>
   </button>
   <div class="track" #track>
-    <div class="line"></div>
     @for (s of stops(); track s.moment.id) {
-      <button type="button" class="stop" [class.is-below]="s.below" [class.is-active]="s.moment.id === activeId()" [class.is-waiting]="s.moment.id === waiting()?.id" [style.left.%]="s.x * 100"
+      <button type="button" class="stop" [class.is-active]="s.moment.id === activeId()" [class.is-waiting]="s.moment.id === waiting()?.id" [style.top.%]="s.x * 100"
               [attr.aria-pressed]="s.moment.id === activeId()" [title]="s.moment.title" tabindex="-1" (click)="clickStop(s.moment)">
-        <span class="dot"></span><span class="year">{{ s.moment.label }}</span>
+        <span class="dot"></span>
+        <span class="text"><span class="year">{{ s.moment.label }}</span>@if (open()) {<span class="title">{{ s.moment.title }}</span>}</span>
       </button>
     }
-    <div class="handle" [style.left.%]="position() * 100" tabindex="0" role="slider" aria-label="Moment" [attr.aria-valuemin]="0" [attr.aria-valuemax]="moments().length - 1"
+    @for (t of ticks(); track t.name) {
+      <button type="button" class="tick" [style.top.%]="t.x * 100" [title]="t.label + ': ' + t.name" tabindex="-1" (click)="clickTick(t.year)">
+        <span class="mark"></span>@if (open()) {<span class="tick-year">{{ t.label }}</span><span class="tick-name">{{ t.name }}</span>}
+      </button>
+    }
+    @if (playSpan(); as span) {
+      <button type="button" class="play" [class.is-playing]="playing()" [style.top.%]="span.from * 100" [attr.aria-label]="playing() ? 'Pause' : 'Play through the moment'" (click)="togglePlay()">
+        @if (playing()) {
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
+        } @else {
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2 L14 8 L4 14 Z" /></svg>
+        }
+      </button>
+    }
+    <div class="handle" [style.top.%]="position() * 100" tabindex="0" role="slider" aria-label="Moment" aria-orientation="vertical" [attr.aria-valuemin]="0" [attr.aria-valuemax]="moments().length - 1"
          [attr.aria-valuenow]="activeIndex()" [attr.aria-valuetext]="moments()[activeIndex()]?.label" (keydown)="key($event)"
          (pointerdown)="down($event)" (pointermove)="move($event)" (pointerup)="up()" (pointercancel)="up()"></div>
   </div>
