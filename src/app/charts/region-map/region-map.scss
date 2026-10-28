@@ -5,23 +5,20 @@
 
 .nsc-region-map {
   --water: #d6e8f6;
-  width: 100%; height: 100%; margin: 0;
+  position: relative; width: 100%; height: 100%; margin: 0;
 
-  svg { display: block; width: 100%; height: 100%; }
-  path { fill: none; }
+  // Lesson 08: the layers, one over the other: the background's canvases (picture, land, lines) and the moment's two
+  // <svg>s (its fills under the lines, everything else over them)
+  // The <svg>s bleed 10% past the window on every side (BLEED in region-map.ts; their viewBox is the window's own
+  // coordinates, bleed included), and are moved about the window's corner, 1/12 of their own box in
+  canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  svg { position: absolute; left: -10%; top: -10%; display: block; width: 120%; height: 120%; transform-origin: 8.3333% 8.3333%; }
+  canvas, .fills, .held { pointer-events: none; }
+  path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
 
-  // Lesson 01: land white like the paper, the sea a faint tint, every line in ink. Weight says what a line is:
-  // county hairlines, rivers bold and dark blue (the one colour water gets), the Danube heavier still. Country borders get the atlas dash-dot, so where one
-  // runs along a river (the Prut, the Danube) the two still read apart.
-  .geography path { stroke-linejoin: round; stroke-linecap: round; }
-  .sea { fill: var(--tint); }
-  .land { fill: var(--surface); }
-  .unit-borders { stroke: var(--muted); stroke-width: 0.4; }
-  .river-halo { stroke: none; }
-  .river { stroke: var(--river); stroke-width: 2; }
-  .river.is-main { stroke-width: 3.2; }
-  .country-borders { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 7 2.5 1.5 2.5; stroke-linecap: butt; }
-  .coastline { stroke: var(--ink); stroke-width: 1; }
+  // Lesson 02: the satellite picture, as the backdrop tuner (backdrop-style.ts) sets it; the land, the lines and their
+  // colours are drawn on the canvases (region-map.ts), from the same tuner
+  .picture { opacity: var(--satellite-opacity); filter: var(--satellite-filter); }
 
   // Lesson 05: territories. A translucent fill so the land shows through; an outline in ink unless it says otherwise.
   .territory { fill: var(--territory, var(--accent)); fill-opacity: 0.55; }
@@ -30,31 +27,10 @@
   .territory-outline { stroke: var(--territory, var(--ink)); stroke-width: 3.5; }
   .territory-outline-halo { stroke: #fff; stroke-width: 7.5; }
 
-  // Lesson 06: the plain, stylized map (the European Union): the water blue, all of it (the sea and, behind the land,
-  // the ocean), the land paper, the borders thin grey lines, no rivers
+  // Lesson 06: the plain, stylized map (the European Union; its water and land on the canvases)
   svg.is-plain {
-    background: var(--water);
-    .river, .river-halo { display: none; }
-    .sea { fill: var(--water); }
-    .land { fill: #fbf8f1; }
-    .country-borders { stroke: #7d8590; stroke-width: 0.8; stroke-dasharray: none; }
-    .coastline { stroke: #5b7a99; stroke-width: 0.8; }
     // The members in the flag's own blue, solid, with faint white dotted borders between them
     .territory { fill-opacity: 1; stroke: rgb(255 255 255 / 0.7); stroke-width: 1.4px; stroke-dasharray: 0.1 3.5; stroke-linecap: round; stroke-linejoin: round; }
-  }
-
-  // Lesson 02: over the satellite picture. The sea shows the picture's own blue (its depth shading), the land gets a light
-  // white veil so the history colours that come later stay readable, and the lines get pale halos: ink and dark blue alone
-  // would sink into the forest green. The numbers come from the backdrop tuner (backdrop-style.ts), as custom properties.
-  .has-satellite {
-    .satellite { opacity: var(--satellite-opacity); filter: var(--satellite-filter); }
-    .sea { fill: none; }
-    .land { fill: rgb(255 255 255 / var(--land-veil)); }
-    .unit-borders { stroke: rgb(255 255 255 / var(--county-lines)); stroke-width: 0.5; }
-    .river-halo { stroke: rgb(255 255 255 / var(--river-halo)); stroke-width: 4; }
-    .river-halo.is-main { stroke-width: 5.6; }
-    .country-borders { stroke: var(--ink); stroke-width: 1.6; }
-    .coastline { stroke: rgb(255 255 255 / var(--coast-line)); }
   }
 
   text { @include paper.mono-label(0.625rem, 0.1em); fill: var(--muted); }
@@ -77,7 +53,6 @@
 
   // Lesson 06: a soft zone: its colour, strong in the middle, fading out over the blurred edge; no line, no hatch
   .zone { fill: var(--territory, var(--accent)); fill-opacity: 0.5; }
-  .zone.is-faint { fill-opacity: 0.3; } // under a later state, for comparison
   .zone.is-light { fill-opacity: 0.55; } // a neighbour, with the lighter fade
 
   // Lesson 06: a land taken: a dotted ink edge on a white backing (round dots), its name in the storybook face and, under
@@ -91,15 +66,11 @@
   }
   .lost-note { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; font-style: italic; letter-spacing: 0; }
 
-  // Lesson 06: zooming. The whole <svg> is a layer of its own that the browser paints once and scales (will-change), all
-  // the time. Nothing about the layer may change as a zoom ends: dropping it, or changing its clip, made the browser
-  // repaint the whole map from scratch, and a big map (the European Union) showed a blank or half-drawn frame. So only a
-  // zoom in draws past the <svg>'s own box (overflow: visible, while the wide picture underneath fills the edges), and the
-  // drawings' cross-fade is a Web Animation that leaves nothing behind (region-map.ts), not a class that comes off.
-  svg { will-change: transform; transform-origin: 0 0; }
-  svg.is-zooming-in { overflow: visible; }
-  .underlay { opacity: var(--satellite-opacity); filter: var(--satellite-filter); }
-  .ghost { pointer-events: none; }
+  // Lesson 06–08: zooming. Each <svg> is a layer of its own that the browser paints once and moves (will-change), all the
+  // time. Nothing about the layer may change as a zoom ends: dropping it made the browser repaint the drawings from
+  // scratch, a blank or half-drawn frame. So the fades are Web Animations that leave nothing behind (region-map.ts), not
+  // classes that come off.
+  svg { will-change: transform, opacity; }
 
   // Lesson 06: a place: an ink dot on a white ring, its name beside it in the storybook face
   .place-dot { fill: var(--ink); stroke: #fff; stroke-width: 2; }

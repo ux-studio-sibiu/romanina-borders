@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, Injectable } from '@angular/core';
 import type { Feature, FeatureCollection, MultiLineString, MultiPolygon, Polygon } from 'geojson';
 import { feature, mesh } from 'topojson-client';
 import type { GeometryCollection, Topology } from 'topojson-specification';
@@ -11,29 +11,25 @@ type Objects = { units: GeometryCollection<UnitProperties>; neighbours: Geometry
 // What the map draws: shapes to fill, and lines to stroke, each line drawn once
 export type BaseGeography = {
   sea: FeatureCollection<Polygon | MultiPolygon>;
-  land: FeatureCollection<Polygon | MultiPolygon, UnitProperties>; // the six countries' units, then the merged neighbours
+  land: FeatureCollection<Polygon | MultiPolygon, UnitProperties>; // Romania's and Moldova's units, then every other country
   coastline: MultiLineString;
   countryBorders: MultiLineString;
   unitBorders: MultiLineString;
   rivers: Feature<MultiLineString, RiverProperties>[];
 };
 
-// Loads lesson 01's file once, for the whole app (providedIn: 'root' ≈ a module-level singleton). Lesson 06: and, only
-// when a moment zooms out past it (loadWide()), the wide data: the same layers over a bigger extent, one shape per country.
+// Loads the map's geography once, for the whole app (providedIn: 'root' ≈ a module-level singleton). Lesson 08: one file
+// for every moment, close up or zoomed out to Europe (npm run data:background): the wide extent, Romania's and Moldova's
+// counties, every other country one shape, simplified less inside the area than outside it.
 @Injectable({ providedIn: 'root' })
 export class Geography {
-  private readonly topology = httpResource<Topology<Objects>>(() => 'data/geography.topo.json');
-  private readonly wantWide = signal(false);
-  private readonly wideTopology = httpResource<Topology<Objects>>(() => this.wantWide() ? 'data/geography-wide.topo.json' : undefined);
+  private readonly topology = httpResource<Topology<Objects>>(() => 'data/background.topo.json');
 
   readonly isLoading = this.topology.isLoading;
   readonly error = this.topology.error;
 
   // TopoJSON → GeoJSON. computed() runs this once when the file has arrived, not on every read.
   readonly base = computed(() => toBase(this.topology.value()));
-  readonly wide = computed(() => toBase(this.wideTopology.value()));
-
-  loadWide() { this.wantWide.set(true); }
 }
 
 function toBase(topo: Topology<Objects> | undefined): BaseGeography | null {
@@ -41,10 +37,10 @@ function toBase(topo: Topology<Objects> | undefined): BaseGeography | null {
   const { units, neighbours, rivers, sea } = topo.objects;
   const polygons = <P extends object>(o: GeometryCollection<P>) => feature(topo, o) as FeatureCollection<Polygon | MultiPolygon, P>;
 
-  // The six countries' units and the merged neighbours, as one collection, so mesh() sees the borders between them.
+  // The units and the merged neighbours, as one collection, so mesh() sees the borders between them.
   // mesh(a, b) is called once per arc with the shapes on each side; a === b means there is only one: the arc is a coast
   // (or the far edge of the data, outside the frame).
-  const all: GeometryCollection<UnitProperties> = { type: 'GeometryCollection', geometries: [...(units.geometries ?? []), ...neighbours.geometries] }; // the wide data has no units
+  const all: GeometryCollection<UnitProperties> = { type: 'GeometryCollection', geometries: [...(units.geometries ?? []), ...neighbours.geometries] };
   const country = (g: { properties?: object }) => (g.properties as UnitProperties | undefined)?.country;
 
   return {

@@ -1,24 +1,24 @@
-import { afterRenderEffect, Component, computed, DestroyRef, ElementRef, inject, input, linkedSignal, signal, untracked, viewChild } from '@angular/core';
-import { geoConicConformal, geoGraticule, geoPath, type GeoPath, type GeoPermissibleObjects } from 'd3-geo';
+import { afterRenderEffect, Component, computed, DestroyRef, effect, ElementRef, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { geoConicConformal, geoGraticule, geoPath, type GeoContext, type GeoPath, type GeoPermissibleObjects } from 'd3-geo';
 import type { Geometry, Polygon } from 'geojson';
 import type { BaseGeography } from '../../data/geography';
 import region from '../../data/region.json';
-import { Backdrop } from './backdrop-style';
+import { Backdrop, type BackdropStyle } from './backdrop-style';
 
 // Lesson 05–06: a territory drawn on the map, by kind:
 //   province: a filled shape in its colour, named at its centre
 //   outline:  a state's border, over everything
 //   empire:   round the provinces: hatched, a dashed edge, its name in spaced capitals at `at` ([lon, lat])
 //   lost:     a land taken away: a dotted edge over the veil, its name and `note` (who took it)
-//   zone:     a land with no known border: its colour with a blurred edge and no line; `faint` under a later state, `light`
-//             a lighter fade (a neighbour, often small)
+//   zone:     a land with no known border: its colour with a blurred edge and no line; `light` a lighter fade (a
+//             neighbour, often small)
 type Shape = { id: string; geometry: GeoPermissibleObjects };
 export type Territory =
   | Shape & { kind: 'province'; colour?: string; label?: string }
   | Shape & { kind: 'outline'; colour?: string }
   | Shape & { kind: 'empire'; colour?: string; label?: string; at?: [number, number] }
   | Shape & { kind: 'lost'; label: string; note: string }
-  | Shape & { kind: 'zone'; colour?: string; label?: string; faint?: boolean; light?: boolean };
+  | Shape & { kind: 'zone'; colour?: string; label?: string; light?: boolean };
 
 // Lesson 06: an arrow across the map, for movement rather than borders (the peoples passing through): a smooth curve
 // through its waypoints, in [lon, lat], first to last; the name (and when) at the waypoint labelAt, the middle by default
@@ -31,7 +31,14 @@ export type MapPlace = { id: string; name: string; at: [number, number] };
 export type Extent = [[number, number], [number, number]];
 
 // Lesson 06: how long the zoom from one view to the next takes, in seconds
-const ZOOM_SECONDS = 1.3;
+const ZOOM_SECONDS = 0.85;
+// Lesson 08: and the moment's drawings round it, so only the background moves while it zooms: the old drawings fade out
+// over FADE_OUT, the camera starts ZOOM_DELAY in; once it has stopped, FADE_GAP later, the new drawings fade in over FADE_IN
+const FADE_OUT = 0.2, ZOOM_DELAY = 0.1, FADE_GAP = 0.1, FADE_IN = 0.15;
+const TOTAL = ZOOM_DELAY + ZOOM_SECONDS + FADE_GAP + FADE_IN;
+// Lesson 08: the drawings' <svg>s reach past the window by this much on every side (a fraction of its size), so they
+// still cover it while the camera finishes, a little out from where they are drawn
+const BLEED = 0.1;
 // Lesson 06: the arrows drawn on one after another, in the order given (by year), each fading again a while later, then
 // started over: each starts ARROW_STEP after the last, takes ARROW_GROW to draw, stays ARROW_LINGER, fades over
 // ARROW_FADE; ARROW_PAUSE of empty map before the first comes back
@@ -42,48 +49,63 @@ const DRAW_YEARS = 60, LINGER_YEARS = 80, FADE_YEARS = 60, PAST = 0.2;
 
 // From data/region.json, shared with the build scripts. The core: from the Tisza plain to the Dniester's mouth, the
 // Balkan range to Galicia; every state of the story is inside it, and the map is fitted so it is always fully in view,
-// whatever the window's shape. The area: the core and about a fifth more on every side. The map runs full bleed:
-// whatever the window shows beyond the core comes from the area, so a wide screen sees Hungary to Budapest and Ukraine
-// to Crimea rather than blank paper.
+// whatever the window's shape. The area: the core and about a fifth more on every side, the detailed satellite
+// picture's extent. The map runs full bleed: whatever the window shows beyond the core is still map.
 const CORE = region.core as Extent;
 const REGION = region.area as Extent;
-// The wide data's extent (lesson 06): for a moment whose view reaches past the area
-const WIDE = region.wide as Extent;
 const PAD = 16; // the core's least distance from the window's edges
 
-// The core and the area as polygons: two parallels and two meridians each. In a conic projection they aren't rectangles:
-// the meridians are straight and lean together towards the north, the parallels are arcs. precision(0.25): a vertex every
-// quarter degree along the parallels. d3 joins vertices with great-circle arcs, not parallels, so at the default 2.5° the
-// top and bottom edges would show kinks.
-const core = geoGraticule().extent(CORE).precision(0.25).outline();
+// An extent as a polygon: two parallels and two meridians. In a conic projection it isn't a rectangle: the meridians are
+// straight and lean together towards the north, the parallels are arcs. precision(0.25): a vertex every quarter degree
+// along the parallels. d3 joins vertices with great-circle arcs, not parallels, so at the default 2.5° the top and
+// bottom edges would show kinks.
+const outline = (extent: Extent) => geoGraticule().extent(extent).precision(0.25).outline();
+const core = outline(CORE);
 // Exported: the satellite picture, the trace tool's alignments and its smoothing all work in the area's box
-export const frame = geoGraticule().extent(REGION).precision(0.25).outline();
-const wideFrame = geoGraticule().extent(WIDE).precision(0.25).outline();
-// The wide satellite picture's extent: smaller than the wide data's (the Roman world, not all of Europe)
-const wideSatelliteFrame = geoGraticule().extent(region.wideSatellite as Extent).precision(0.25).outline();
+export const frame = outline(REGION);
 
-// Whether a view needs the wide data: any of it outside the detailed area
+// Whether a view reaches past the detailed area (it needs the wide satellite picture, and shows no county lines)
 export function needsWide(view: Extent | null | undefined) {
   return !!view && (view[0][0] < REGION[0][0] || view[0][1] < REGION[0][1] || view[1][0] > REGION[1][0] || view[1][1] > REGION[1][1]);
 }
 // The map's projection, before it is fitted to a size. Exported: the trace tool smooths its shapes in it (lesson 04).
 export const regionProjection = () => geoConicConformal().parallels(region.projection.parallels as [number, number]).rotate(region.projection.rotate as [number, number]);
 
+// Lesson 08: the plane. The background (the satellite pictures, the land, every line) is drawn in one fixed projection,
+// the area 1000 units wide, once, for every moment. A view is only a camera over it: a scale k and an offset x, y (a
+// point at P on the plane is at k·P + (x, y) on screen). Every view's projection is this one scaled and moved, so the
+// camera from one view to the next is exact, and the zoom between them is the camera eased from one to the other.
+const PLANE = regionProjection().fitWidth(1000, frame);
+type Camera = { k: number; x: number; y: number };
+
+// Lesson 08: the two satellite pictures, each placed over its extent's box on the plane: the wide one (the Roman world)
+// under the detailed one (the area), whose edge is feathered over `inset` degrees, so the two meet without a seam
+const PICTURES = [
+  { src: 'data/satellite-wide.webp', extent: region.wideSatellite as Extent, inset: 1 },
+  { src: 'data/satellite.webp', extent: REGION, inset: 0.6 }
+].map(p => {
+  const [[x0, y0], [x1, y1]] = geoPath(PLANE).bounds(outline(p.extent));
+  return { ...p, box: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };
+});
+type Picture = typeof PICTURES[number];
+
+// Lesson 08: how the background looks: over the satellite picture, on paper, or the plain stylized map (blue water,
+// no rivers: the European Union). `units`: how strongly the county lines show (none on a view past the area).
+type Look = 'satellite' | 'paper' | 'plain';
+type Scene = { look: Look; units: number };
+
 // D3 does the math, Angular renders the DOM: d3-geo turns [lon, lat] lines into SVG path strings in computed(),
 // the template binds them. Unlike data-viz's flat map (a fixed 960 × 500 viewBox), this map fills the window,
-// so the projection is refitted to the measured size whenever it changes.
+// so the projection is refitted to the measured size whenever it changes. Lesson 08: the background under it is drawn
+// on canvases, from the plane, by a camera (above).
 @Component({
   selector: 'app-region-map',
   templateUrl: './region-map.html',
   styleUrl: './region-map.scss',
-  // The backdrop tuner's numbers, as custom properties the satellite styles read
+  // The backdrop tuner's numbers the styles read, as custom properties (the canvases read the rest themselves)
   host: {
     '[style.--satellite-filter]': 'backdrop.filter()',
     '[style.--satellite-opacity]': 'backdrop.style().opacity',
-    '[style.--land-veil]': 'backdrop.style().veil',
-    '[style.--county-lines]': 'backdrop.style().counties',
-    '[style.--river-halo]': 'backdrop.style().halo',
-    '[style.--coast-line]': 'backdrop.style().coast',
     '[style.--outside-veil]': 'backdrop.style().outside'
   }
 })
@@ -100,11 +122,10 @@ export class RegionMap {
   readonly nameAt = input<Record<string, [number, number]>>({}); // lesson 07: names placed by hand, by id, in [lon, lat]
   readonly places = input<MapPlace[]>([]); // lesson 06: dots with names
   readonly view = input<Extent | null>(null); // lesson 06: a box to fit instead of the core (a moment zoomed out)
-  readonly wide = input(false); // lesson 06: draw the wide data's extent and picture (the geography input is then the wide data)
 
   protected readonly backdrop = inject(Backdrop);
 
-  // The clip path's id must be unique in the document, in case a lesson page ever shows a second map
+  // The ids in the <defs> must be unique in the document, in case a lesson page ever shows a second map
   protected readonly clipId = `region-clip-${++maps}`;
 
   // The host's size in CSS pixels, from a ResizeObserver. A signal, so a resize re-runs the computeds below (zoneless:
@@ -114,7 +135,15 @@ export class RegionMap {
   constructor() {
     const observer = new ResizeObserver(([entry]) => this.size.set({ width: entry.contentRect.width, height: entry.contentRect.height }));
     observer.observe(inject(ElementRef<HTMLElement>).nativeElement);
-    inject(DestroyRef).onDestroy(() => { observer.disconnect(); this.zoomAnimation?.cancel(); this.ghost?.remove(); });
+    inject(DestroyRef).onDestroy(() => { observer.disconnect(); cancelAnimationFrame(this.frameId); this.endMotion(); });
+
+    // Lesson 08: the detailed picture first; the wide one after it, unless the browser asks to save data (then only once
+    // a view needs it: widePicture())
+    this.picture(1).then(() => { if (!saveData()) this.widePicture(); });
+    effect(() => { if (this.satellite() && needsWide(this.view())) untracked(() => this.widePicture()); });
+
+    // Lesson 08: the background repainted whenever what it is drawn from changes (during a zoom every frame is painted)
+    effect(() => { this.layers(); this.pictures(); this.backdrop.style(); this.size(); this.request(); });
 
     // Lesson 06: the arrows drawn on in turn, looping (after the render, once their masks and names are in the page). Not
     // for a visitor who asked for less motion: they see them all at once.
@@ -125,7 +154,7 @@ export class RegionMap {
       if (!n || !svg || reducedMotion() || this.arrowsAt()) return;
       const cycle = (n - 1) * ARROW_STEP + ARROW_GROW + ARROW_LINGER + ARROW_FADE + ARROW_PAUSE, at = (s: number) => Math.min(1, s / cycle);
       const timing = { duration: cycle * 1000, iterations: Infinity };
-      const [reveals, arrows, labels, years] = ['.arrow-reveal', 'path.arrow', '.arrow-label', '.arrow-year'].map(s => [...svg.querySelectorAll<SVGElement>(s)].filter(e => !e.closest('.ghost')));
+      const [reveals, arrows, labels, years] = ['.arrow-reveal', 'path.arrow', '.arrow-label', '.arrow-year'].map(s => [...svg.querySelectorAll<SVGElement>(s)]);
       for (let i = 0; i < n; i++) {
         const start = i * ARROW_STEP, drawn = start + ARROW_GROW, end = drawn + ARROW_LINGER;
         // The caption at the top: from its arrow's start until the next one's (the last, until it has faded)
@@ -142,96 +171,185 @@ export class RegionMap {
     // Lesson 06: when the view changes, zoom from the old one to the new: once the new view is in the page (after the
     // render, still before the browser paints), so the zoom fades in the new drawings, not the old ones
     afterRenderEffect(() => {
-      const start = this.camera();
-      if (start) untracked(() => this.zoom(start));
+      const camera = this.camera(), scene = this.scene(), { width, height } = this.size(), key = JSON.stringify(this.view());
+      untracked(() => this.move(camera, scene, key, width, height));
     });
   }
 
-  // Lesson 06: zooming between two views. Every view uses the same projection, only scaled and moved to fit, so going from
-  // one to the next is an exact scale and pan of the whole picture. The map draws the new view once, at its final place,
-  // and the whole <svg> is scaled as one picture, starting to look like the old view and easing back to no transform: a
-  // CSS transform on a layer the browser paints once (will-change) and scales on the graphics card, run as a Web
-  // Animation on the compositor thread. Nothing is repainted while it moves, not the borders, the hatching or the blurred
-  // zones, so it stays smooth however heavy the map. Started in the same tick the new view renders, before the browser
-  // paints, so the first frame is already the old view. Not on a resize (the size changed too), not the first time, not
-  // for a visitor who asked for less motion.
+  // --- The camera ------------------------------------------------------------------------------------------------------
+
+  // Lesson 08: the view's camera over the plane: its projection is the plane's scaled by k and moved by x, y
+  private readonly camera = computed<Camera>(() => {
+    const p = this.projection(), k = p.scale() / PLANE.scale(), [tx, ty] = p.translate(), [px, py] = PLANE.translate();
+    return { k, x: tx - k * px, y: ty - k * py };
+  });
+  private readonly scene = computed<Scene>(() => ({ look: this.plain() ? 'plain' : this.satellite() ? 'satellite' : 'paper', units: needsWide(this.view()) ? 0 : 1 }));
+
+  // Lesson 06–08: zooming between two views. The background is repainted every frame by the camera eased from the old
+  // view to the new. The moment's drawings (the two <svg>s over it) stay out of the way: the old ones fade out as the
+  // camera starts, the new ones, drawn once for the new view, fade in as it lands, so in between only the background
+  // moves, sharp at every step. While either shows, its <svg> is moved each frame to where that camera puts it: a
+  // transform on a layer the browser paints once (will-change), so nothing in it is repainted, and it never slips off the
+  // land. They are near their own view by then, so each <svg>'s bleed past the window covers it. Started in the same
+  // tick the new view renders, before the browser paints, so the first frame is still the old view; a zoom started
+  // during another starts from where that one has got to. Not on a resize (the size changed too), not the first time,
+  // not for a visitor who asked for less motion.
+  private readonly pictureCanvas = viewChild<ElementRef<HTMLCanvasElement>>('picture');
+  private readonly baseCanvas = viewChild<ElementRef<HTMLCanvasElement>>('base');
+  private readonly linesCanvas = viewChild<ElementRef<HTMLCanvasElement>>('lines');
+  private readonly fillsSvg = viewChild<ElementRef<SVGSVGElement>>('fillsSvg');
   private readonly mapSvg = viewChild<ElementRef<SVGSVGElement>>('mapSvg');
-  private readonly cameraState = computed(() => {
-    const p = this.projection(), { width, height } = this.size();
-    return { key: JSON.stringify(this.view()), wide: this.wide(), satellite: this.satellite(), k: p.scale(), t: p.translate(), width, height };
-  });
-  protected readonly camera = linkedSignal<ReturnType<typeof this.cameraState>, { k: number; x: number; y: number; underlay: boolean } | null>({
-    source: this.cameraState,
-    computation: (now, previous) => {
-      const was = previous?.source;
-      if (!was || was.key === now.key || was.width !== now.width || was.height !== now.height || reducedMotion()) return null;
-      const k = was.k / now.k;
-      // underlay: zooming in from the wide data to the detailed: the wide picture stays under it until the zoom ends, so the
-      // edges the detailed data doesn't reach aren't blank on the way
-      return { k, x: was.t[0] - k * now.t[0], y: was.t[1] - k * now.t[1], underlay: was.wide && !now.wide && was.satellite };
-    }
-  });
-  protected readonly zoomingIn = computed(() => (this.camera()?.k ?? 1) < 1); // the start smaller than the end
-  private zoomAnimation?: Animation;
+  private readonly heldFillsSvg = viewChild<ElementRef<SVGSVGElement>>('heldFills');
+  private readonly heldMapSvg = viewChild<ElementRef<SVGSVGElement>>('heldMap');
+  private svgs() { return [this.fillsSvg(), this.mapSvg()].flatMap(r => r ? [r.nativeElement] : []); }
+  private heldSvgs() { return [this.heldFillsSvg(), this.heldMapSvg()].flatMap(r => r ? [r.nativeElement] : []); }
+
+  private last: { key: string; width: number; height: number; camera: Camera; scene: Scene } | null = null; // the view drawn
+  private motion: { from: Camera; to: Camera; was: Scene; start: number; held: Camera | null; fades: Animation[] } | null = null;
+  private shown: Camera | null = null; // the camera on screen now
+  private held: { at: Camera; layers: { html: string; classes: string; opacity: number }[] } | null = null;
+  private frameId = 0;
   private arrowAnimations: Animation[] = [];
-  private ghost?: SVGGElement;
 
-  // Lesson 06: the cross-fade. Called by the parent just before it changes the view: a copy of what is drawn now, kept to
-  // fade out over the new drawings while the zoom moves both. Not the bare map (the pictures, the sea and the land),
-  // unless `backdrop`: when the next view turns the satellite picture on or off, the old backdrop fades out too, rather
-  // than switching at once. Without clip paths (they would clip in the new view's coordinates); the filters it uses are
-  // the map's own, by id.
-  holdDrawings(backdrop = false) {
-    const svg = this.mapSvg()?.nativeElement;
-    this.ghost?.remove();
-    this.ghost = undefined;
-    if (!svg || reducedMotion()) return;
-    const copy = svg.cloneNode(true) as SVGSVGElement;
-    copy.querySelectorAll(backdrop ? 'defs, .ghost' : 'defs, image, .sea, .land, .ghost').forEach(e => e.remove());
-    copy.querySelectorAll('[clip-path]').forEach(e => e.removeAttribute('clip-path'));
-    const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    ghost.setAttribute('class', 'ghost');
-    ghost.setAttribute('aria-hidden', 'true');
-    ghost.append(...copy.childNodes);
-    this.ghost = ghost;
+  // Lesson 06: called by the parent just before it changes the view: a copy of what is drawn now, to fade out as the zoom
+  // starts (the background cross-fades itself, on the canvases). With its own patterns, filters and masks, renamed, as
+  // the next moment may not have them; from wherever its fade has got to, if a zoom is still under way.
+  holdDrawings() {
+    this.held = null;
+    if (!this.last || reducedMotion()) return;
+    this.held = { at: this.last.camera, layers: this.svgs().map(svg => ({ html: heldCopy(svg), classes: svg.getAttribute('class') ?? '', opacity: Number(getComputedStyle(svg).opacity) })) };
   }
 
-  // The zoom as keyframes: the scale eased geometrically (each moment the same proportion closer, so it feels even) about
-  // the one point that stays still (the start's x, y = that point × (1 − k)); a plain pan when the scale doesn't change.
-  // Sampled 40 times and played linearly, so the easing is in the samples and the browser only interpolates between them.
-  private zoom({ k, x, y }: { k: number; x: number; y: number }) {
-    const svg = this.mapSvg()?.nativeElement;
-    if (!svg) return void this.camera.set(null);
-    this.zoomAnimation?.cancel();
-    // The old drawings, in the new view's coordinates (the start's transform undone), so they move with the zoom and end
-    // where the new ones are; faded out by the time the zoom is halfway, while the new fade in from a third of the way.
-    // The fade in has no end keyframe and no fill: it eases to each drawing's own opacity and then is simply gone, so
-    // nothing changes on screen when it ends (the arrows keep their own animations).
-    const drawings = svg.querySelectorAll<SVGElement>(':is(path, circle, text):not(.sea, .land, defs *, mask *, path.arrow, .arrow-label, .arrow-year)');
-    for (const drawing of drawings) drawing.animate([{ offset: 0, opacity: 0 }, { offset: 0.35, opacity: 0 }], { duration: ZOOM_SECONDS * 1000, easing: 'linear' });
-    const ghost = this.ghost;
-    this.ghost = undefined;
-    if (ghost) {
-      ghost.setAttribute('transform', `matrix(${1 / k} 0 0 ${1 / k} ${-x / k} ${-y / k})`);
-      svg.append(ghost);
-      ghost.animate([{ opacity: 1 }, { opacity: 0, offset: 0.55 }, { opacity: 0 }], { duration: ZOOM_SECONDS * 1000, easing: 'linear', fill: 'forwards' });
+  private move(camera: Camera, scene: Scene, key: string, width: number, height: number) {
+    const was = this.last, held = this.held, svgs = this.svgs();
+    this.last = { key, width, height, camera, scene };
+    this.held = null;
+    const from = this.shown;
+    this.endMotion();
+    if (!was || !from || was.width !== width || was.height !== height || (was.key === key && was.scene.look === scene.look) || reducedMotion() || !svgs.length) {
+      this.shown = camera;
+      return this.request();
     }
-    const ease = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2; // ease in and out (cubic)
-    const frames = Array.from({ length: 41 }, (_, i) => {
-      const e = ease(i / 40), kk = k ** (1 - e), f = Math.abs(1 - k) < 1e-6 ? 1 - e : (1 - kk) / (1 - k);
-      return { transform: `matrix(${kk}, 0, 0, ${kk}, ${x * f}, ${y * f})` };
+    const timing = { duration: TOTAL * 1000, easing: 'linear' };
+    // The new drawings hidden until just after the camera has stopped. The fade has no end keyframe and no fill: it eases
+    // to the <svg>'s own opacity and then is simply gone, so nothing changes on screen when it ends.
+    const fades = svgs.map(svg => svg.animate([{ opacity: 0 }, { opacity: 0, offset: (ZOOM_DELAY + ZOOM_SECONDS + FADE_GAP) / TOTAL }], timing));
+    // The old drawings, in layers of their own, faded out as the camera starts
+    if (held) this.heldSvgs().forEach((svg, i) => {
+      const layer = held.layers[i];
+      svg.setAttribute('class', `${layer.classes} held`);
+      svg.innerHTML = layer.html;
+      fades.push(svg.animate([{ opacity: layer.opacity }, { opacity: 0, offset: FADE_OUT / TOTAL }, { opacity: 0 }], { ...timing, fill: 'forwards' }));
     });
-    this.zoomAnimation = svg.animate(frames, { duration: ZOOM_SECONDS * 1000, easing: 'linear', fill: 'forwards' });
-    this.zoomAnimation.finished.then(() => this.camera.set(null), () => { /* cancelled by a newer zoom */ }).finally(() => ghost?.remove());
+    this.motion = { from, to: camera, was: was.scene, start: performance.now(), held: held?.at ?? null, fades };
+    this.step(performance.now()); // the first frame now, before the browser paints
   }
 
-  // The wide picture under a zoom in from the wide data (its box in the new view's projection)
-  protected readonly underlayBox = computed(() => {
-    const [[x0, y0], [x1, y1]] = this.path().bounds(wideSatelliteFrame);
-    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+  private endMotion() {
+    if (!this.motion) return;
+    this.motion.fades.forEach(a => a.cancel());
+    this.motion = null;
+    for (const svg of this.svgs()) svg.style.transform = '';
+    for (const svg of this.heldSvgs()) { svg.replaceChildren(); svg.style.transform = ''; }
+  }
+
+  // One frame: the camera now (eased: the scale geometrically, so each moment is the same proportion closer, and the
+  // offset with it, so the one point that stays still stays still), the drawings moved to it, the background painted by it
+  private step(now: number) {
+    const last = this.last;
+    if (!last) return;
+    let camera = last.camera, was = last.scene, p = 1;
+    const m = this.motion;
+    if (m) {
+      const s = (now - m.start) / 1000;
+      if (s < TOTAL) {
+        p = ease(Math.max(0, Math.min(1, (s - ZOOM_DELAY) / ZOOM_SECONDS)));
+        camera = between(m.from, m.to, p);
+        was = m.was;
+        for (const svg of this.svgs()) svg.style.transform = relative(camera, last.camera);
+        if (m.held) for (const svg of this.heldSvgs()) svg.style.transform = relative(camera, m.held);
+        this.request();
+      } else this.endMotion();
+    }
+    this.shown = camera;
+    this.paint(camera, was, last.scene, p);
+  }
+
+  private request() {
+    if (!this.frameId) this.frameId = requestAnimationFrame(now => { this.frameId = 0; this.step(now); });
+  }
+
+  // --- The background ----------------------------------------------------------------------------------------------
+
+  // Lesson 08: the background's layers as canvas paths on the plane, made once when the geography arrives
+  private readonly layers = computed(() => {
+    const g = this.geography();
+    if (!g || typeof Path2D === 'undefined') return null;
+    const trace = (o: GeoPermissibleObjects) => { const path = new Path2D(); geoPath(PLANE, path as unknown as GeoContext)(o); return path; };
+    const rivers = (danube: boolean) => trace({ type: 'FeatureCollection', features: g.rivers.filter(r => (String(r.id) === 'danube') === danube) });
+    return { sea: trace(g.sea), land: trace(g.land), units: trace(g.unitBorders), countries: trace(g.countryBorders), coast: trace(g.coastline), rivers: rivers(false), danube: rivers(true) };
   });
 
-  protected readonly viewBox = computed(() => `0 0 ${this.size().width} ${this.size().height}`);
+  // Lesson 08: the satellite pictures, feathered, once each has loaded (by address)
+  private readonly pictures = signal<Record<string, HTMLCanvasElement>>({});
+  private picture(i: number) {
+    const p = PICTURES[i];
+    return feathered(p).then(canvas => { if (canvas && !this.pictures()[p.src]) this.pictures.update(all => ({ ...all, [p.src]: canvas })); });
+  }
+  // The wide picture, loaded now if it isn't yet: the parent waits for it before zooming out to a view that needs it
+  widePicture() { return this.picture(0); }
+
+  private scratch?: HTMLCanvasElement;
+  private tokens?: ReturnType<typeof readTokens>;
+
+  // Three canvases: the pictures (under the CSS filter the tuner sets), the land and the sea, and, over the moment's
+  // fills, the lines. Between two looks (a zoom to the plain map) each canvas cross-fades from the old to the new.
+  private paint(camera: Camera, was: Scene, now: Scene, p: number) {
+    const picture = this.pictureCanvas()?.nativeElement, base = this.baseCanvas()?.nativeElement, lines = this.linesCanvas()?.nativeElement;
+    if (!picture || !base || !lines) return;
+    const { width, height } = this.size(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(width * dpr), h = Math.round(height * dpr);
+    const at: Transform = [dpr * camera.k, 0, 0, dpr * camera.k, dpr * camera.x, dpr * camera.y];
+    const scenes: [Scene, number][] = was.look === now.look ? [[now, 1]] : [[was, 1 - p], [now, p]];
+    const units = was.units + (now.units - was.units) * p, style = this.backdrop.style(), tokens = this.tokens ??= readTokens(base);
+
+    const pc = clear(picture, w, h), satellite = scenes.reduce((sum, [s, weight]) => sum + (s.look === 'satellite' ? weight : 0), 0);
+    if (satellite > 0) {
+      pc.globalAlpha = satellite;
+      pc.imageSmoothingQuality = 'high';
+      pc.setTransform(...at);
+      for (const pic of PICTURES) { const c = this.pictures()[pic.src]; if (c) pc.drawImage(c, pic.box.x, pic.box.y, pic.box.width, pic.box.height); }
+      pc.globalAlpha = 1;
+    }
+
+    const bc = clear(base, w, h), lc = clear(lines, w, h), layers = this.layers();
+    if (!layers) return;
+    for (const [scene, weight] of scenes) {
+      this.blend(bc, weight, ctx => drawBase(ctx, scene.look, layers, at, tokens, style, w, h));
+      this.blend(lc, weight, ctx => drawLines(ctx, scene.look, layers, at, camera.k, tokens, style, units));
+    }
+  }
+
+  // Drawn straight on, or, partly shown, on a scratch canvas first and laid on at that strength (so its own overlaps
+  // don't show through each other)
+  private blend(target: CanvasRenderingContext2D, weight: number, draw: (ctx: CanvasRenderingContext2D) => void) {
+    if (weight >= 1) return draw(target);
+    if (weight <= 0) return;
+    const scratch = this.scratch ??= document.createElement('canvas');
+    draw(clear(scratch, target.canvas.width, target.canvas.height));
+    target.setTransform(1, 0, 0, 1, 0, 0);
+    target.globalAlpha = weight;
+    target.drawImage(scratch, 0, 0);
+    target.globalAlpha = 1;
+  }
+
+  // --- The moment's drawings ---------------------------------------------------------------------------------------
+
+  // The window's own coordinates, with the bleed round them (the <svg>s are that much bigger than the window)
+  protected readonly viewBox = computed(() => {
+    const { width: w, height: h } = this.size();
+    return `${-BLEED * w} ${-BLEED * h} ${(1 + 2 * BLEED) * w} ${(1 + 2 * BLEED) * h}`;
+  });
 
   // Lambert conformal conic: true scale along 44° and 48° N (they bracket Romania, 43.6°–48.3° N), centred on 25° E so
   // that meridian stands upright. Conformal: angles and small shapes are kept, so the Carpathian arc bends as it should.
@@ -240,19 +358,9 @@ export class RegionMap {
   readonly projection = computed(() => {
     const { width, height } = this.size();
     const view = this.view();
-    return regionProjection().fitExtent([[PAD, PAD], [width - PAD, height - PAD]], view ? geoGraticule().extent(view).precision(0.25).outline() : core);
+    return regionProjection().fitExtent([[PAD, PAD], [width - PAD, height - PAD]], view ? outline(view) : core);
   });
   private readonly path = computed(() => geoPath(this.projection()));
-
-  // The data's extent drawn: the area, or the wide extent for a zoomed-out moment
-  private readonly extentFrame = computed(() => this.wide() ? wideFrame : frame);
-  protected readonly frame = computed(() => this.path()(this.extentFrame()) ?? '');
-  protected readonly satelliteHref = computed(() => this.wide() ? 'data/satellite-wide.webp' : 'data/satellite.webp');
-  // The satellite picture's box: its extent's bounding box (for the area, the same as frameBox)
-  protected readonly satelliteBox = computed(() => {
-    const [[x0, y0], [x1, y1]] = this.path().bounds(this.wide() ? wideSatelliteFrame : frame);
-    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
-  });
 
   // Lesson 02: where the satellite picture goes, and lesson 04's unit for placing a reference map (public).
   // scripts/build-satellite.mjs drew it in this same projection, fitted to the area's bounding box; here the projection is
@@ -262,19 +370,10 @@ export class RegionMap {
     return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
   });
 
-  // Lesson 01: the base geography, as path strings, one per layer (all the units in one string). The template clips it to
-  // the area, so the units that run past it (Ukraine's oblasts, Poland) end at its edge, usually off screen.
-  protected readonly sea = computed(() => this.draw(this.geography()?.sea));
-  protected readonly land = computed(() => this.draw(this.geography()?.land));
-  protected readonly unitBorders = computed(() => this.draw(this.geography()?.unitBorders));
-  protected readonly countryBorders = computed(() => this.draw(this.geography()?.countryBorders));
-  protected readonly coastline = computed(() => this.draw(this.geography()?.coastline));
-  protected readonly rivers = computed(() => (this.geography()?.rivers ?? []).map(r => ({ id: String(r.id), d: this.draw(r) })));
-
   // Fills over the land and under every line; outlines over everything, so a state's border reads above rivers and coasts
   // Lesson 06: soft zones, under the provinces' fills; blurred by an SVG filter (the template), so the edge fades out
   // `light`: a lighter fade (a neighbour, often small: the strong one would leave little of it)
-  protected readonly zones = computed(() => this.ofKind('zone').map(t => ({ id: t.id, colour: t.colour, faint: !!t.faint, light: !!t.light, d: this.draw(t.geometry) })));
+  protected readonly zones = computed(() => this.ofKind('zone').map(t => ({ id: t.id, colour: t.colour, light: !!t.light, d: this.draw(t.geometry) })));
   protected readonly fills = computed(() => this.ofKind('province').map(t => ({ id: t.id, colour: t.colour, d: this.draw(t.geometry) })));
   protected readonly outlines = computed(() => this.ofKind('outline').map(t => ({ id: t.id, colour: t.colour, d: this.draw(t.geometry) })));
 
@@ -305,13 +404,14 @@ export class RegionMap {
     return { id: t.id, x, y, size, lines: twoLines(t.label!), colour: t.colour ? darken(t.colour, 0.35) : undefined };
   }));
 
-  // The veil outside the focus: the whole window with the focus cut out (even-odd: the focus's rings make holes in the
-  // window's rectangle), so the neighbours, their borders and the empires' hatching recede behind the story's land
+  // The veil outside the focus: a box with the focus cut out (even-odd: the focus's rings make holes in it), so the
+  // neighbours, their borders and the empires' hatching recede behind the story's land. The box is the <svg>'s, bleed
+  // and all, and a little more, so a soft edge's blur doesn't show at it.
   protected readonly outside = computed(() => {
     const focus = this.focus();
     if (!focus) return '';
-    const { width, height } = this.size();
-    return `M0 0H${width}V${height}H0Z${this.draw(focus)}`;
+    const { width: w, height: h } = this.size(), m = 2 * BLEED;
+    return `M${-m * w} ${-m * h}H${(m + 1) * w}V${(m + 1) * h}H${-m * w}Z${this.draw(focus)}`;
   });
 
   // Lesson 06: the places, projected
@@ -349,6 +449,131 @@ export class RegionMap {
   private draw(o: GeoPermissibleObjects | undefined) { return o ? this.path()(o) ?? '' : ''; }
 
 }
+
+// --- Painting the background (lesson 08) -------------------------------------------------------------------------------
+
+type Transform = [number, number, number, number, number, number];
+type Layers = { sea: Path2D; land: Path2D; units: Path2D; countries: Path2D; coast: Path2D; rivers: Path2D; danube: Path2D };
+
+// The colours the styles share, read once from the page's custom properties
+function readTokens(el: Element) {
+  const css = getComputedStyle(el), v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+  return { ink: v('--ink', '#141414'), river: v('--river', '#1b3a73'), muted: v('--muted', '#6b6862'), tint: v('--tint', '#f2f1ed'), surface: v('--surface', '#ffffff'), water: v('--water', '#d6e8f6') };
+}
+type Tokens = ReturnType<typeof readTokens>;
+
+// A canvas at the window's size in device pixels, cleared
+function clear(canvas: HTMLCanvasElement, w: number, h: number) {
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return ctx;
+}
+
+// Lesson 01–02, 06: the land and the sea. Over the satellite picture only a light white veil on the land, so the history
+// colours stay readable; on paper the land white and the sea a faint tint; on the plain map all the water blue (behind
+// the land too: the Black Sea is the only sea the data has as a shape) and the land paper
+function drawBase(ctx: CanvasRenderingContext2D, look: Look, layers: Layers, at: Transform, tokens: Tokens, style: BackdropStyle, w: number, h: number) {
+  if (look === 'plain') { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = tokens.water; ctx.fillRect(0, 0, w, h); }
+  ctx.setTransform(...at);
+  if (look === 'paper') { ctx.fillStyle = tokens.tint; ctx.fill(layers.sea); }
+  ctx.fillStyle = look === 'plain' ? '#fbf8f1' : look === 'paper' ? tokens.surface : white(style.veil);
+  ctx.fill(layers.land);
+}
+
+// Lesson 01–02, 06: the lines, from thinnest to heaviest, so a river or a country border is never hidden under a county
+// line; their widths in screen pixels, the same at every zoom. Weight says what a line is: county hairlines, rivers bold
+// and dark blue (the one colour water gets), the Danube heavier still, country borders the atlas dash-dot, so where one
+// runs along a river (the Prut, the Danube) the two still read apart. Over the satellite picture the lines get pale
+// halos (ink and dark blue alone would sink into the forest green); on the plain map no rivers, the borders thin grey.
+function drawLines(ctx: CanvasRenderingContext2D, look: Look, layers: Layers, at: Transform, k: number, tokens: Tokens, style: BackdropStyle, units: number) {
+  ctx.setTransform(...at);
+  ctx.lineJoin = 'round';
+  const line = (path: Path2D, colour: string, width: number, dash?: number[]) => {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width / k;
+    ctx.lineCap = dash ? 'butt' : 'round';
+    ctx.setLineDash(dash ? dash.map(d => d / k) : []);
+    ctx.stroke(path);
+  };
+  const satellite = look === 'satellite', plain = look === 'plain';
+  if (units > 0) {
+    ctx.globalAlpha = units;
+    line(layers.units, satellite ? white(style.counties) : tokens.muted, satellite ? 0.5 : 0.4);
+    ctx.globalAlpha = 1;
+  }
+  if (!plain) {
+    if (satellite) { line(layers.rivers, white(style.halo), 4); line(layers.danube, white(style.halo), 5.6); }
+    line(layers.rivers, tokens.river, 2);
+    line(layers.danube, tokens.river, 3.2);
+  }
+  line(layers.countries, plain ? '#7d8590' : tokens.ink, plain ? 0.8 : satellite ? 1.6 : 1.2, plain ? undefined : [7, 2.5, 1.5, 2.5]);
+  line(layers.coast, plain ? '#5b7a99' : satellite ? white(style.coast) : tokens.ink, plain ? 0.8 : 1);
+}
+
+function white(alpha: number) { return `rgb(255 255 255 / ${alpha})`; }
+
+// Lesson 08: a satellite picture with its edge feathered: kept only inside its extent shrunk by `inset` degrees,
+// blurred over as many again, so it fades out by its own edge. The blur is a shadow's (canvas filters aren't in every
+// browser): the shrunk extent is filled far off the canvas, and only its blurred shadow, moved back, lands on it. Once
+// per address, for every map.
+const featheredPictures = new Map<string, Promise<HTMLCanvasElement | null>>();
+function feathered(p: Picture) {
+  if (!featheredPictures.has(p.src)) featheredPictures.set(p.src, (async () => {
+    const image = new Image();
+    image.src = p.src;
+    await image.decode();
+    const w = image.naturalWidth, h = image.naturalHeight, sx = w / p.box.width, sy = h / p.box.height;
+    const perDegree = Math.abs(PLANE([25, 45])![1] - PLANE([25, 46])![1]) * sy, blur = p.inset * perDegree, off = w + 4 * blur;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    const [[x0, y0], [x1, y1]] = p.extent, i = p.inset;
+    ctx.setTransform(sx, 0, 0, sy, off - p.box.x * sx, -p.box.y * sy);
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = blur;
+    ctx.shadowOffsetX = -off;
+    ctx.beginPath();
+    geoPath(PLANE, ctx)(outline([[x0 + i, y0 + i], [x1 - i, y1 - i]]));
+    ctx.fill();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.shadowColor = 'transparent';
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.drawImage(image, 0, 0);
+    return canvas;
+  })().catch(() => null));
+  return featheredPictures.get(p.src)!;
+}
+
+// A drawing layer's transform: what was drawn for camera `at`, moved to where `camera` puts it
+function relative(camera: Camera, at: Camera) {
+  const r = camera.k / at.k;
+  return `matrix(${r}, 0, 0, ${r}, ${camera.x - r * at.x}, ${camera.y - r * at.y})`;
+}
+
+// A drawing layer's content, as markup, with every id (and every url(#id) or #id pointing at one) renamed, so the copy
+// keeps its own patterns, filters and masks beside the new drawings'
+function heldCopy(svg: SVGSVGElement) {
+  let html = svg.innerHTML;
+  for (const { id } of svg.querySelectorAll('[id]')) {
+    html = html.replace(new RegExp(`(id="|#)${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=["')&])`, 'g'), `$1${id}-held`);
+  }
+  return html;
+}
+
+// The zoom's easing, and the camera that far from one view to the next. In and out, sine: gentler than a cubic, whose
+// long slow end (its last fifth of the time for 3% of the way) made the zoom seem to drag as it landed
+function ease(t: number) { return (1 - Math.cos(Math.PI * t)) / 2; }
+function between(a: Camera, b: Camera, e: number): Camera {
+  const k = a.k ** (1 - e) * b.k ** e, f = Math.abs(b.k - a.k) < 1e-9 * b.k ? e : (k - a.k) / (b.k - a.k);
+  return { k, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+}
+
+// A browser asking to save data (it gets the wide picture only once a view needs it)
+function saveData() { return !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData; }
 
 let maps = 0;
 

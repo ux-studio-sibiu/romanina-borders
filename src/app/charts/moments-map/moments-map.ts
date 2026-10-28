@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, Injector, input, isDevMode, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, input, isDevMode, signal, viewChild } from '@angular/core';
 import { type MapArrow, type MapPlace, needsWide, RegionMap, type Territory } from '../region-map/region-map';
 import { MomentIcon } from '../moment-icon/moment-icon';
 import { TimeScale } from '../time-scale/time-scale';
@@ -60,15 +60,12 @@ export class MomentsMap {
   protected readonly zone = computed(() => this.shapes.zones().find(z => z.id === this.moment().zone));
   protected readonly neighbours = computed(() => (this.moment().neighbours ?? []).map(id => this.shapes.zones().find(z => z.id === id)!).filter(Boolean));
 
-  // Lesson 06: the moment's own view, and whether it needs the wide data (loaded the first time one does)
+  // Lesson 06: the moment's own view
   protected readonly view = computed(() => this.moment().view ?? null);
-  protected readonly wide = computed(() => needsWide(this.view()));
-  // While the wide data is still loading, the detailed map stands in
-  protected readonly map = computed(() => this.wide() ? this.geography.wide() ?? this.geography.base() : this.geography.base());
   protected readonly places = computed<MapPlace[]>(() => (this.moment().places ?? []).map(p => ({ id: `${this.moment().id}-${p.name}`, ...p })));
   // Lesson 06: the moment's whole countries (the EU's members), from the map's own countries: filled and named
   protected readonly countries = computed<Territory[]>(() => {
-    const land = this.map()?.land.features ?? [];
+    const land = this.geography.base()?.land.features ?? [];
     return (this.moment().countries ?? []).flatMap(c => {
       const parts = land.filter(f => c.codes.includes(f.properties.country));
       if (!parts.length) return [];
@@ -80,9 +77,6 @@ export class MomentsMap {
   protected readonly empires = computed(() => (this.moment().empires ?? []).map(id => this.shapes.empires().find(e => e.id === id)!).filter(Boolean));
 
   constructor() {
-    // The wide data: fetched once a moment needs it (and earlier on intent: prepare(), below)
-    effect(() => { if (this.wide()) this.geography.loadWide(); });
-
     // In development, every id the moments and the colours use must be in shapes.topo.json (data/palette.ts): a typo would
     // quietly show nothing. Checked once the file has loaded.
     if (isDevMode()) effect(() => {
@@ -92,25 +86,18 @@ export class MomentsMap {
     });
   }
 
-  // Lesson 06: a moment with another view zooms; the map keeps a copy of the old drawings first, to cross-fade them (and
-  // the old backdrop, when the satellite picture turns on or off). A zoom out to the wide data waits until it and its
-  // picture are loaded and decoded: started earlier, the map would swap its data, or show a blank picture, mid-zoom.
-  private readonly injector = inject(Injector);
+  // Lesson 06: a moment with another view zooms; the map keeps a copy of the old drawings first, to cross-fade them. A
+  // zoom out past the area over the satellite picture waits until the wide picture is ready: started earlier, its edges
+  // would show blank, then the picture pop in, mid-zoom.
   private chosen = 0;
   protected async choose(moment: Moment) {
     const ticket = ++this.chosen;
-    if (needsWide(moment.view)) {
-      this.geography.loadWide();
-      await Promise.all([this.wideLoaded(), moment.plain ? null : decoded('data/satellite-wide.webp')]);
+    if (needsWide(moment.view) && !moment.plain) {
+      await this.regionMap()?.widePicture();
       if (ticket !== this.chosen) return; // another moment was chosen meanwhile
     }
-    if (JSON.stringify(moment.view ?? null) !== JSON.stringify(this.view())) this.regionMap()?.holdDrawings(!!moment.plain !== !!this.moment().plain);
+    if (JSON.stringify(moment.view ?? null) !== JSON.stringify(this.view())) this.regionMap()?.holdDrawings();
     this.momentId.set(moment.id);
-  }
-  private wideLoaded() {
-    return new Promise<void>(resolve => {
-      const watch = effect(() => { if (this.geography.wide()) { watch.destroy(); resolve(); } }, { injector: this.injector });
-    });
   }
 
   // The scroll wheel: one moment per gesture, down for later, up for earlier. A trackpad sends a stream of small events
@@ -141,14 +128,10 @@ export class MomentsMap {
   // The names placed by hand (data/name-places.ts)
   protected readonly namePlaces = NAME_PLACES;
 
-  // On intent (the pointer over, or the keyboard on, a zoomed-out moment's button): fetch the wide data now, so the zoom
-  // out finds it ready. Not for a visitor whose browser asks to save data: they get it on the click.
+  // On intent (the pointer over, or the keyboard on, a zoomed-out moment's button): fetch the wide picture now, so the
+  // zoom out finds it ready (the map fetches it anyway, soon after its own, unless the browser asks to save data)
   protected prepare(moment: Moment) {
-    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    if (needsWide(moment.view) && !saveData) {
-      this.geography.loadWide();
-      if (!moment.plain) decoded('data/satellite-wide.webp');
-    }
+    if (needsWide(moment.view) && !moment.plain) this.regionMap()?.widePicture();
   }
 
   // The empires round it, the state's provinces, filled, then its outline over everything: one, or one per country when it has several (c. 1400)
@@ -158,9 +141,10 @@ export class MomentsMap {
     if (this.countries().length) return [...this.countries(), ...(state ? [{ kind: 'outline' as const, id: `${state.id}-outline`, geometry: state }] : [])];
     // The empires first, under everything else
     const empires = this.empires().map(e => ({ kind: 'empire' as const, id: e.id, geometry: e, colour: EMPIRE_COLOURS[e.id], label: e.properties.name, at: e.properties.at }));
-    // A soft zone: the moment's land itself (the Dacians), or, under a state, faint and unnamed, for comparison
+    // A soft zone: the moment's land itself (the Dacians), or, under a state, unnamed, for comparison (as strong as on its
+    // own moment, so it reads as the same kingdom)
     const zone = this.zone();
-    const zones = zone ? [{ kind: 'zone' as const, id: zone.id, geometry: zone, colour: this.colour(zone.id), faint: !!state, label: state ? undefined : zone.properties.name }] : [];
+    const zones = zone ? [{ kind: 'zone' as const, id: zone.id, geometry: zone, colour: this.colour(zone.id), label: state ? undefined : zone.properties.name }] : [];
     const neighbours = this.neighbours().map(z => ({ kind: 'zone' as const, id: z.id, geometry: z, colour: this.colour(z.id), light: true, label: z.properties.name }));
     if (!state) return [...empires, ...neighbours, ...zones];
     // The lands taken: dotted, over the veil, named, with who took them
@@ -175,17 +159,6 @@ export class MomentsMap {
         : [{ kind: 'outline' as const, id: `${state.id}-outline`, geometry: state }])
     ];
   });
-}
-
-// A picture loaded and decoded, once per address: drawn the moment it is needed, not a frame or more later
-const pictures = new Map<string, Promise<void>>();
-function decoded(src: string) {
-  if (!pictures.has(src)) {
-    const picture = new Image();
-    picture.src = src;
-    pictures.set(src, picture.decode().catch(() => undefined));
-  }
-  return pictures.get(src)!;
 }
 
 // Lesson 07: the time scale open or folded, open at first

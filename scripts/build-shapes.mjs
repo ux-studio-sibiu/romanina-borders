@@ -68,9 +68,10 @@ const STATES = [
   { id: 'c1000', label: 'c. 1000', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'banat'] },
   // Basarab's Wallachia (1330) and Bogdan's early Moldavia (1359), side by side
   { id: '1359', label: '1330–1359', name: 'Wallachia and Moldavia', blocks: ['wallachia', 'moldavia-1359'], lands: ['wallachia', 'moldavia-1359'] },
-  // Mircea the Elder's Wallachia, Alexander the Good's Moldavia (from the mountains to the Dniester and the sea), and
-  // Transylvania in the Kingdom of Hungary: three lands side by side (see LANDS). For the moments from 1400 to 1504.
-  { id: 'c1400', label: 'c. 1400', name: 'Wallachia, Moldavia and Transylvania', blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak', 'transylvania-north', 'transylvania-south', 'banat'], lands: ['wallachia', 'moldavia-1400', 'transylvania-1400'] },
+  // Mircea the Elder's Wallachia and Alexander the Good's Moldavia (from the mountains to the Dniester and the sea), side
+  // by side (see LANDS). For the moments from 1400 to 1504. Transylvania, in the Kingdom of Hungary, isn't theirs: the
+  // moment draws only its border, dotted (data/moments.ts).
+  { id: 'c1400', label: 'c. 1400', name: 'Wallachia and Moldavia', blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak'], lands: ['wallachia', 'moldavia-1400'] },
   // Michael the Brave's union, summer 1600: the three lands under one prince, without their Ottoman edges (Dobruja, the
   // the Banat with Arad, the Budjak). Simplified: Tighina, Ottoman from 1538, stays in.
   { id: '1600', name: "Michael the Brave's union", blocks: ['wallachia', 'moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'transylvania-north', 'transylvania-south'] },
@@ -90,7 +91,6 @@ const LANDS = [
   { id: 'wallachia', name: 'Wallachia', blocks: ['wallachia'] },
   { id: 'moldavia-1359', name: 'Moldavia', blocks: ['moldavia-1359'] },
   { id: 'moldavia-1400', name: 'Moldavia', blocks: ['moldavia', 'bukovina-south', 'bukovina-north', 'bessarabia', 'budjak'] },
-  { id: 'transylvania-1400', name: 'Transylvania, in the Kingdom of Hungary', blocks: ['transylvania-north', 'transylvania-south', 'banat'] },
   { id: 'moldavia-1812', name: 'Moldavia', blocks: ['moldavia'] }
 ];
 
@@ -214,8 +214,12 @@ const ZONES = [
 
 // Provinces split only for the moments that need it (Transylvania by the 1940 line, Bukovina by the 1775–1918 one): where
 // a moment has both halves, it shows them as one province. Each state's `provinces` is its blocks with such pairs joined.
+// The Banat goes in with Transylvania wherever both are there (a child's map: one land west of the Carpathians, not
+// two), whole or, in 1940, with its southern half; tried in order, so the biggest join wins.
 const COMBINED = [
+  { id: 'transylvania-banat', name: 'Transylvania', nameRo: 'Transilvania', parts: ['transylvania-north', 'transylvania-south', 'banat'] },
   { id: 'transylvania', name: 'Transylvania', nameRo: 'Transilvania', parts: ['transylvania-north', 'transylvania-south'] },
+  { id: 'transylvania-south-banat', name: 'Southern Transylvania', nameRo: 'Transilvania de Sud', parts: ['transylvania-south', 'banat'] },
   { id: 'bukovina', name: 'Bukovina', nameRo: 'Bucovina', parts: ['bukovina-north', 'bukovina-south'] }
 ];
 // Merged shapes for drawing a land as one piece where the moments don't join it themselves: Bessarabia with the Budjak, as

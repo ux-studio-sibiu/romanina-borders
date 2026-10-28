@@ -52,11 +52,17 @@ simple, roughly traced shapes, not a research atlas.
    castle, a crown, a sword, the Roman eagle); arrows for the peoples passing through; lands taken drawn dotted; a moment
    can zoom out with its own view (wide data over 45° W–68° E, 20°–80° N: Europe, for 2007's European Union), with its neighbours as soft zones and places marked.
 
-7. **Navigation and narration.** Big Back / Next buttons, a row of icons along the bottom as the timeline, keyboard and
-   swipe; optionally a small narrator (an owl, or the Dacian wolf-dragon banner) and read-aloud text.
+7. **The time scale and navigation** (the time scale ✓). The moments down a time scale at the right of the map, roughly
+   in proportion to their years (pushed apart where they crowd), each with its title; it folds to the years. A triangle
+   beside it is where in time the map is: drag it, rest it between moments, step it with the arrow keys; a moment that
+   would zoom waits until it is let go. Its place is a year, so 271–1000's arrows draw in their own years, with grey ticks
+   and a small play for that span. The mouse wheel steps a moment at a time. The row of year buttons stays on lesson 05.
+   Still to do: big Back / Next buttons (the only way a phone will have: the scale hides on a narrow window), swipe on a
+   touch screen, and ← → for the whole page.
 
 8. **Polish and ship.** Readability and touch on tablets, reduced motion, a quick fact check of every moment, a short
-   "where these maps come from" page, and deploy.
+   "where these maps come from" page, and deploy. Optionally a small narrator (an owl, or the Dacian wolf-dragon banner)
+   and the story read aloud (once planned for lesson 7).
 
 ## Credits to carry
 

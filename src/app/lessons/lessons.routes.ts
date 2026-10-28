@@ -9,5 +9,6 @@ export const lessonRoutes: Routes = [
   { path: 'moments', loadComponent: () => import('./lesson-moments/lesson-moments').then(m => m.LessonMoments), title: '03 The moments' },
   { path: 'trace', loadComponent: () => import('./lesson-trace/lesson-trace').then(m => m.LessonTrace), title: '04 A simple trace tool' },
   { path: 'shapes', loadComponent: () => import('./lesson-shapes/lesson-shapes').then(m => m.LessonShapes), title: '05 The map shapes' },
-  { path: 'player', loadComponent: () => import('./lesson-player/lesson-player').then(m => m.LessonPlayer), title: '06 The player' }
+  { path: 'player', loadComponent: () => import('./lesson-player/lesson-player').then(m => m.LessonPlayer), title: '06 The player' },
+  { path: 'time-scale', loadComponent: () => import('./lesson-time-scale/lesson-time-scale').then(m => m.LessonTimeScale), title: '07 The time scale and navigation' }
 ];

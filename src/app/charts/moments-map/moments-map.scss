@@ -66,5 +66,4 @@
 .swatch { width: 14px; height: 14px; border: 1px solid var(--ink); }
 // A soft zone: its colour fading out, as on the map
 .swatch.soft { border: none; background: radial-gradient(circle, var(--zone) 35%, transparent 75%); }
-.swatch.soft.is-faint { opacity: 0.55; }
 

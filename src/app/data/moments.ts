@@ -25,8 +25,8 @@ export interface Moment {
   text: string;        // for children: one or two short sentences
   icon: MomentIcon;
   state?: string;      // the shape it shows: a state id in shapes.topo.json
-  zone?: string;       // or a soft land with no known border: a zone id in shapes.topo.json (with a state too: shown faint
-                       // under it, for comparison, like Burebista's kingdom under Roman Dacia)
+  zone?: string;       // or a soft land with no known border: a zone id in shapes.topo.json (with a state too: shown
+                       // under it, unnamed, for comparison, like Burebista's kingdom under Roman Dacia)
   empires?: string[];  // the empires round or over it: empire ids in shapes.topo.json
   status: ShapeStatus;
   note?: string;       // what is left to do on its shape
@@ -43,6 +43,7 @@ export interface Moment {
   // Places to mark, a dot and a name each
   places?: { name: string; at: [number, number] }[];
   // Lands taken away at this moment, drawn dotted next to what is left (blocks in shapes.topo.json), each with who took it
+  // (or, the same way, a land beside them that isn't theirs, with whose it is: Transylvania c. 1400)
   lost?: { block: string; to: string }[];
   // Whole countries to show (lesson 06), from the wide data by their codes, each filled and named
   countries?: { codes: string[]; name: string }[];
@@ -121,7 +122,7 @@ export const MOMENTS: Moment[] = [
   {
     id: 'princes', label: '1400–1504', year: 1457, title: 'Mircea, Vlad and Stephen', icon: 'shield',
     text: 'Brave princes like Mircea the Elder, Vlad III and Stephen the Great defended their lands against the mighty Ottoman Empire. Stephen built many churches and monasteries, and you can still visit them today.',
-    state: 'c1400', empires: ['hungary', 'ottoman'],
+    state: 'c1400', empires: ['hungary', 'ottoman'], lost: [{ block: 'transylvania-banat', to: 'in the Kingdom of Hungary' }],
     status: 'built', note: 'Mircea the Elder, Vlad the Impaler and Stephen the Great, between Hungary and the Ottomans.'
   },
   {

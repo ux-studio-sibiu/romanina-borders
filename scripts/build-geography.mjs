@@ -29,11 +29,14 @@ const FILES = {
 // The map's area (src/app/data/region.json, shared with the app): the story's core and about a fifth more on every side,
 // so a full-screen map has land to its edges. Its edges are meridians and parallels, so in [lon, lat] it is exactly this
 // box. Anything touching it is kept, whole: a unit cut at the edge would be useless for merging later.
-const WIDE = process.argv.includes('--wide');
+// --wide: the wide extent, one shape per country (the shapes' build reads it: an empire past the area).
+// --background (lesson 08): what the map draws under every moment, one file for every view: the wide extent, Romania's
+// and Moldova's counties as units, every other country one shape, simplified for the view it is seen at (below).
+const WIDE = process.argv.includes('--wide'), BACKGROUND = process.argv.includes('--background');
 const region = JSON.parse(await readFile(new URL('../src/app/data/region.json', import.meta.url), 'utf8'));
-const REGION = WIDE ? region.wide : region.area;
+const REGION = WIDE || BACKGROUND ? region.wide : region.area;
 // Admin-1 units kept as units; every other country is merged into one shape. The wide data keeps none: one shape per country.
-const COUNTRIES = WIDE ? [] : ['ROU', 'MDA', 'UKR', 'BGR', 'HUN', 'SRB'];
+const COUNTRIES = WIDE ? [] : BACKGROUND ? ['ROU', 'MDA'] : ['ROU', 'MDA', 'UKR', 'BGR', 'HUN', 'SRB'];
 
 // The six rivers, by their Natural Earth names. The Danube includes its delta branches (and the Borcea, a branch above the delta).
 const RIVERS = [
@@ -50,8 +53,11 @@ const RIVERS = [
 // snapping targets, so every point kept is a real Natural Earth point.
 // The wide data is only ever seen zoomed out (a fifth of the scale or less): far coarser, and its islets go (rings under
 // MIN_RING square degrees, about 200 km²: Malta, 316 km², stays)
-const MIN_WEIGHT = WIDE ? 1e-2 : 1e-5;
-const MIN_RING = WIDE ? 0.02 : 0;
+const MIN_WEIGHT = WIDE ? 1e-2 : BACKGROUND ? 1e-4 : 1e-5;
+const MIN_RING = WIDE ? 0.02 : BACKGROUND ? 0.01 : 0;
+// The background: inside the area (seen close) a corner smaller than MIN_WEIGHT goes, about a pixel at the closest view;
+// outside it (only ever seen zoomed out) one FAR times bigger
+const FAR = 20;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cacheDir = join(root, 'scripts/.cache');
@@ -129,17 +135,22 @@ const before = topo.arcs.reduce((n, a) => n + a.length, 0);
 if (MIN_RING) topo = filter(topo, filterWeight(topo, MIN_RING));
 // filter() leaves an empty collection (the wide data's units) with no type: put it back, the app reads every object
 for (const o of Object.values(topo.objects)) if (!o.geometries) Object.assign(o, { type: 'GeometryCollection', geometries: [] });
-topo = simplify(presimplify(topo), MIN_WEIGHT);
+topo = presimplify(topo);
+if (BACKGROUND) {
+  const [[w, s], [e, n]] = region.area;
+  for (const arc of topo.arcs) for (const p of arc) if (p[0] < w || p[0] > e || p[1] < s || p[1] > n) p[2] /= FAR;
+}
+topo = simplify(topo, MIN_WEIGHT);
 
 // Quantize last: snap coordinates to a 100 000 × 100 000 grid over the bounding box (about 17° × 11°, so ~15 m)
 // and store each point as a small integer delta from the previous one
-topo = quantize(topo, WIDE ? 2e4 : 1e5);
+topo = quantize(topo, WIDE ? 2e4 : BACKGROUND ? 5e4 : 1e5);
 topo.source = { name: 'Natural Earth 1:10m', version: VERSION, files: Object.values(FILES), url: 'https://www.naturalearthdata.com/', license: 'Public domain' };
 
 // --- 5. Write -----------------------------------------------------------------------------------
 await mkdir(outDir, { recursive: true });
 const json = JSON.stringify(topo);
-await writeFile(join(outDir, WIDE ? 'geography-wide.topo.json' : 'geography.topo.json'), json);
+await writeFile(join(outDir, WIDE ? 'geography-wide.topo.json' : BACKGROUND ? 'background.topo.json' : 'geography.topo.json'), json);
 
 // --- 6. Report ----------------------------------------------------------------------------------
 const kb = s => `${(Buffer.byteLength(s) / 1024).toFixed(0)} kB`;
@@ -156,6 +167,6 @@ console.log(`Size:        ${kb(json)}`);
 // the islets (San Marino, the Vatican, Monaco, Liechtenstein): listed, not an error.
 for (const name of ['units', 'neighbours', 'rivers', 'sea']) {
   const empty = (feature(topo, topo.objects[name]).features ?? []).filter(f => !f.geometry);
-  if (empty.length && WIDE && name === 'neighbours') console.log(`Dropped:     ${empty.map(f => f.id).join(' ')}`);
+  if (empty.length && (WIDE || BACKGROUND) && name === 'neighbours') console.log(`Dropped:     ${empty.map(f => f.id).join(' ')}`);
   else if (empty.length) throw new Error(`${name}: ${empty.length} features lost their geometry`);
 }

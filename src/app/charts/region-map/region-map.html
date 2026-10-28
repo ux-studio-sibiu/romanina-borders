@@ -1,20 +1,22 @@
 <figure class="nsc-region-map">
   <!-- Nothing to draw until the ResizeObserver has measured the host -->
   @if (size().width) {
-    <svg #mapSvg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()" [class.is-zooming-in]="zoomingIn()" [class.is-plain]="plain()">
+    <!-- Lesson 08: the background, one plane for every moment, painted by the camera (region-map.ts): the satellite
+         pictures, then the land and the sea. (No graticule: the projection's curved grid showed at the picture's edges
+         while zooming, so lesson 06 took it out.) -->
+    <canvas #picture class="picture" aria-hidden="true"></canvas>
+    <canvas #base class="base" aria-hidden="true"></canvas>
+
+    <!-- The moment's fills, over the land and under the lines -->
+    <svg #fillsSvg class="fills" [attr.viewBox]="viewBox()" aria-hidden="true" [class.is-plain]="plain()">
       <defs>
-        <clipPath [attr.id]="clipId"><path [attr.d]="frame()" /></clipPath>
         <!-- Lesson 06: the soft zones' fuzzy edge: the zone shrunk first (erode), then blurred wide, so the colour fades in
-             over a broad band inside its edge; the veil round it is grown by the same amount (dilate) and blurred the same
-             way, so the two meet. The filters' boxes are grown so the blur isn't cut off. -->
+             over a broad band inside its edge; the filters' boxes are grown so the blur isn't cut off. -->
         <filter [attr.id]="clipId + '-soft'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="16" /><feGaussianBlur stdDeviation="26" />
         </filter>
         <filter [attr.id]="clipId + '-soft-light'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="4" /><feGaussianBlur stdDeviation="9" />
-        </filter>
-        <filter [attr.id]="clipId + '-soft-veil'" x="-20%" y="-20%" width="140%" height="140%">
-          <feMorphology operator="dilate" radius="16" /><feGaussianBlur stdDeviation="26" />
         </filter>
         <!-- Lesson 05: each empire's hatch: a tint of its colour and a light diagonal line every 7px, light so it shows over
              the dark satellite picture -->
@@ -25,56 +27,44 @@
           </pattern>
         }
       </defs>
+      @for (e of empires(); track e.id) { <path class="empire" [attr.d]="e.d" [style.fill]="'url(#' + e.pattern + ')'" /> }
+      @for (z of zones(); track z.id) { <path class="zone" [class.is-light]="z.light" [attr.d]="z.d" [style.--territory]="z.colour" [attr.filter]="'url(#' + clipId + (z.light ? '-soft-light)' : '-soft)')" /> }
+      @for (t of fills(); track t.id) { <path class="territory" [attr.d]="t.d" [style.--territory]="t.colour" /> }
+    </svg>
 
+    <!-- Lesson 08: the last moment's fills, fading out as a zoom starts (region-map.ts fills it) -->
+    <svg #heldFills class="held" [attr.viewBox]="viewBox()" aria-hidden="true"></svg>
 
-      <!-- Lesson 06: while zooming in from the wide data, the wide picture underneath, so the edges aren't blank on the way -->
-      @if (camera()?.underlay && satellite()) {
-        @let u = underlayBox();
-        <image class="satellite underlay" href="data/satellite-wide.webp" [attr.x]="u.x" [attr.y]="u.y" [attr.width]="u.width" [attr.height]="u.height" preserveAspectRatio="none" />
+    <!-- Lesson 08: the background's lines, over the fills -->
+    <canvas #lines class="lines" aria-hidden="true"></canvas>
+
+    <svg #mapSvg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()" [class.is-plain]="plain()">
+      <defs>
+        <!-- The veil round a soft zone, grown by the zone's erode (dilate) and blurred the same way, so the two meet -->
+        <filter [attr.id]="clipId + '-soft-veil'" x="-20%" y="-20%" width="140%" height="140%">
+          <feMorphology operator="dilate" radius="16" /><feGaussianBlur stdDeviation="26" />
+        </filter>
+      </defs>
+      <!-- Lesson 05: everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
+           and every name stay above it -->
+      @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" [attr.filter]="softFocus() ? 'url(#' + clipId + '-soft-veil)' : null" /> }
+      <!-- A border drawn twice: a wide white line, then the black one on it, so it reads over any colour -->
+      @for (e of empires(); track e.id) { <path class="empire-outline-halo" [attr.d]="e.d" /> }
+      @for (e of empires(); track e.id) { <path class="empire-outline" [attr.d]="e.d" [style.stroke]="e.colour" /> }
+      <!-- Lesson 06: lands taken away, dotted, over the veil and under the state's border -->
+      @for (l of lost(); track l.id) { <path class="lost-halo" [attr.d]="l.d" /><path class="lost-edge" [attr.d]="l.d" /> }
+      @for (t of outlines(); track t.id) { <path class="territory-outline-halo" [attr.d]="t.d" /> }
+      @for (t of outlines(); track t.id) { <path class="territory-outline" [attr.d]="t.d" [style.--territory]="t.colour" /> }
+      <!-- Lesson 06: arrows: one white shape each, outlined in black, revealed tail to head by a mask: a wide stroke along
+           its middle line, drawn on in turn (region-map.ts) -->
+      <!-- Lesson 07: or set by a year (the time scale's), arrowsAt -->
+      @let at = arrowsAt();
+      @for (a of arrowPaths(); track a.id; let i = $index) {
+        <mask [attr.id]="clipId + '-arrow-' + i"><path class="arrow-reveal" [attr.d]="a.line" pathLength="1" [style.stroke-dashoffset]="at ? 1 - at.states[i].drawn : null" /></mask>
+        <path class="arrow" [attr.d]="a.d" [attr.mask]="'url(#' + clipId + '-arrow-' + i + ')'" [style.opacity]="at ? at.states[i].opacity : null" />
       }
 
-      <!-- Lesson 01: the geography, inside the map's area only (full bleed: its edges are usually off screen). Fills first, then lines from thinnest to heaviest, so a river
-           or a country border is never hidden under a county line. (No graticule: the projection's
-           curved grid showed at the picture's edges while zooming, so lesson 06 took it out.) -->
-      <g class="geography" [class.has-satellite]="satellite()" [attr.clip-path]="'url(#' + clipId + ')'">
-        <!-- Lesson 02: the satellite picture first, under everything. preserveAspectRatio none: its box is the area's
-             bounding box, already the picture's own shape. -->
-        @if (satellite()) {
-          @let s = satelliteBox();
-          <image class="satellite" [attr.href]="satelliteHref()" [attr.x]="s.x" [attr.y]="s.y" [attr.width]="s.width" [attr.height]="s.height" preserveAspectRatio="none" />
-        }
-        <path class="sea" [attr.d]="sea()" />
-        <path class="land" [attr.d]="land()" />
-        @for (e of empires(); track e.id) { <path class="empire" [attr.d]="e.d" [style.fill]="'url(#' + e.pattern + ')'" /> }
-        @for (z of zones(); track z.id) { <path class="zone" [class.is-faint]="z.faint" [class.is-light]="z.light" [attr.d]="z.d" [style.--territory]="z.colour" [attr.filter]="'url(#' + clipId + (z.light ? '-soft-light)' : '-soft)')" /> }
-        @for (t of fills(); track t.id) { <path class="territory" [attr.d]="t.d" [style.--territory]="t.colour" /> }
-        <path class="unit-borders" [attr.d]="unitBorders()" />
-        <!-- Each river twice: a pale halo, then the blue line on it, so it stays readable over dark forest -->
-        @for (r of rivers(); track r.id) { <path class="river-halo" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
-        @for (r of rivers(); track r.id) { <path class="river" [class.is-main]="r.id === 'danube'" [attr.d]="r.d" /> }
-        <path class="country-borders" [attr.d]="countryBorders()" />
-        <path class="coastline" [attr.d]="coastline()" />
-        <!-- Lesson 05: everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
-             and every name stay above it -->
-        @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" [attr.filter]="softFocus() ? 'url(#' + clipId + '-soft-veil)' : null" /> }
-        <!-- A border drawn twice: a wide white line, then the black one on it, so it reads over any colour -->
-        @for (e of empires(); track e.id) { <path class="empire-outline-halo" [attr.d]="e.d" /> }
-        @for (e of empires(); track e.id) { <path class="empire-outline" [attr.d]="e.d" [style.stroke]="e.colour" /> }
-        <!-- Lesson 06: lands taken away, dotted, over the veil and under the state's border -->
-        @for (l of lost(); track l.id) { <path class="lost-halo" [attr.d]="l.d" /><path class="lost-edge" [attr.d]="l.d" /> }
-        @for (t of outlines(); track t.id) { <path class="territory-outline-halo" [attr.d]="t.d" /> }
-        @for (t of outlines(); track t.id) { <path class="territory-outline" [attr.d]="t.d" [style.--territory]="t.colour" /> }
-        <!-- Lesson 06: arrows: one white shape each, outlined in black, revealed tail to head by a mask: a wide stroke along
-             its middle line, drawn on in turn (region-map.ts) -->
-        <!-- Lesson 07: or set by a year (the time scale's), arrowsAt -->
-        @let at = arrowsAt();
-        @for (a of arrowPaths(); track a.id; let i = $index) {
-          <mask [attr.id]="clipId + '-arrow-' + i"><path class="arrow-reveal" [attr.d]="a.line" pathLength="1" [style.stroke-dashoffset]="at ? 1 - at.states[i].drawn : null" /></mask>
-          <path class="arrow" [attr.d]="a.d" [attr.mask]="'url(#' + clipId + '-arrow-' + i + ')'" [style.opacity]="at ? at.states[i].opacity : null" />
-        }
-      </g>
-
-      <!-- Lesson 05: the territories' names, over every line (outside the clip: a name near the area's edge isn't cut) -->
+      <!-- Lesson 05: the territories' names, over every line -->
       <!-- Lesson 06: places, a dot and a name beside it -->
       @for (p of placePoints(); track p.id) {
         <circle class="place-dot" [attr.cx]="p.x" [attr.cy]="p.y" r="4" />
@@ -101,5 +91,7 @@
         </text>
       }
     </svg>
+    <!-- Lesson 08: and the rest of its drawings -->
+    <svg #heldMap class="held" [attr.viewBox]="viewBox()" aria-hidden="true"></svg>
   }
 </figure>

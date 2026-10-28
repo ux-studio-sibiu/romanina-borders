@@ -1,7 +1,7 @@
 <div class="nsc-moments-map" (wheel)="scroll($event)">
   <!-- The veil is left off when neighbours are shown: they are the point of the view -->
-  <app-region-map [geography]="map()" [territories]="territories()" [focus]="neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
-                  [arrows]="arrows()" [nameAt]="namePlaces" [arrowYear]="scaleYear()" [places]="places()" [view]="view()" [wide]="wide()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
+  <app-region-map [geography]="geography.base()" [territories]="territories()" [focus]="neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
+                  [arrows]="arrows()" [nameAt]="namePlaces" [arrowYear]="scaleYear()" [places]="places()" [view]="view()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
   @if (!moment().state && !moment().zone) {
     @if (details()) { <p class="no-shape" [attr.data-status]="moment().status">{{ moment().status === 'trace' ? 'To trace' : 'Arrows, in the player' }}</p> }
   }
@@ -46,12 +46,12 @@
       <p class="story">{{ m.text }}</p>
     }
     <!-- A key only for what the map doesn't name itself: the provinces, empires, peoples and lands taken all have their
-         names on the map. Left: Burebista's kingdom drawn faint and unnamed under a later state, and the European
+         names on the map. Left: Burebista's kingdom drawn unnamed under a later state, and the European
          Union's blue, whose countries are named but not what joins them. -->
-    @let faintZone = state() ? zone() : undefined;
-    @if (faintZone || countries().length) {
+    @let underZone = state() ? zone() : undefined;
+    @if (underZone || countries().length) {
       <ul class="legend">
-        @if (faintZone; as z) { <li><span class="swatch soft is-faint" [style.--zone]="colour(z.id)"></span>{{ z.properties.name }}, roughly (before the Romans)</li> }
+        @if (underZone; as z) { <li><span class="swatch soft" [style.--zone]="colour(z.id)"></span>{{ z.properties.name }}, roughly (before the Romans)</li> }
         @if (countries().length) { <li><span class="swatch" [style.background]="euColour"></span>The European Union today</li> }
       </ul>
     }

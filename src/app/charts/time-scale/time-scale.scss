@@ -70,4 +70,5 @@
   &.is-dragging { cursor: grabbing; }
   &.is-dragging .handle { cursor: grabbing; transition: none; }
   &.is-playing .handle { transition: none; }
+  @media (prefers-reduced-motion: reduce) { .handle { transition: none; } }
 }
