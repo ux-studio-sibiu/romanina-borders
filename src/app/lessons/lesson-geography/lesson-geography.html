@@ -24,7 +24,7 @@
   <pre><code>npm run data:geography            # uses scripts/.cache
 npm run data:geography -- --fresh # downloads again</code></pre>
   <ol>
-    <li><strong>Download, once.</strong> The four GeoJSON files go to <code>scripts/.cache/</code>, which is gitignored. The output, <code>public/data/geography.topo.json</code>, is committed, so neither the app nor a fresh clone depends on GitHub.</li>
+    <li><strong>Download, once.</strong> The four GeoJSON files go to <code>scripts/.cache/</code>, which is gitignored. The output, <code>scripts/data/geography.topo.json</code>, is committed, so neither the app nor a fresh clone depends on GitHub. (Since lesson 08 the map draws <code>public/data/background.topo.json</code>; this file only feeds the shapes' build.)</li>
     <li><strong>Select the area.</strong> A unit is kept if its bounds (<code>geoBounds</code>) touch the map's area, 16.5°–34° E, 41.2°–50.2° N (<code>data/region.json</code>, lesson 00): the story's core and about a fifth more on every side, so the full-bleed map has land to its edges. (Later, lesson 06: 14.5°–36° E, for wide laptop screens.) The area's edges are meridians and parallels, so in [lon, lat] the conic's fan is exactly this box. Units are kept whole, never cut at the edge: Chernivtsi oblast must stay Chernivtsi oblast to become Northern Bukovina in step 5.</li>
     <li><strong>Build the topology.</strong> <code>topology()</code> from <code>topojson-server</code> finds every border two units share and stores it once, as an arc. Four objects: <code>units</code>, <code>neighbours</code>, <code>rivers</code>, <code>sea</code>.</li>
     <li><strong>Merge the neighbours.</strong> The countries round the six are context, not building blocks: <code>mergeArcs</code> turns their units into one shape each.</li>
@@ -70,7 +70,7 @@ npm run data:geography -- --fresh # downloads again</code></pre>
   <h2>Files in this lesson</h2>
   <ul class="note">
     <li><code>scripts/build-geography.mjs</code>: the pipeline. <code>package.json</code> gets the <code>data:geography</code> script.</li>
-    <li><code>public/data/geography.topo.json</code>: its output, committed</li>
+    <li><code>scripts/data/geography.topo.json</code>: its output, committed (read by the shapes' build, not shipped with the site)</li>
     <li><code>.gitignore</code>: <code>/scripts/.cache</code></li>
     <li><code>src/app/data/geography.ts</code>: loads the file and builds the layers</li>
     <li><code>src/app/app.config.ts</code>: <code>provideHttpClient(withFetch())</code></li>

@@ -1,0 +1,63 @@
+<div class="nsc-map-spots">
+  @for (s of spots(); track s.id) {
+    <button type="button" class="spot" [class.is-open]="open() === s.id" [style.left.px]="s.x" [style.top.px]="s.y"
+            [attr.aria-expanded]="open() === s.id" [attr.aria-label]="s.title ? s.name + ': ' + s.title : s.name" (click)="toggle(s.id)">
+      <span class="ring" aria-hidden="true"></span>
+      <span class="badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          @switch (s.kind) {
+            <!-- A deck on piers, two arches under it -->
+            @case ('bridge') { <path d="M2 8h20M4 8v11M12 8v11M20 8v11M4 15a4 4 0 0 1 8 0M12 15a4 4 0 0 1 8 0" /> }
+            <!-- Two towers -->
+            @case ('city') { <path d="M2 20h20M4 20v-9l4-3 4 3v9M12 20V6l4-3 4 3v14" /> }
+            <!-- A church with its cross -->
+            @case ('monastery') { <path d="M12 2v5M10 4h4M4 20h16M6 20v-8l6-5 6 5v8M10 20v-4h4v4" /> }
+            <!-- Battlements and a gate -->
+            @case ('fortress') { <path d="M2 20h20M4 20V7h3v2h3V7h4v2h3V7h3v13M10 20v-4a2 2 0 0 1 4 0v4" /> }
+          }
+        </svg>
+      </span>
+    </button>
+  }
+
+  @if (card(); as c) {
+    <aside class="spot-card" [class.is-wide]="c.wide" [style.left.px]="c.left" [style.width.px]="c.width" [attr.aria-label]="c.spot.title ?? c.spot.name">
+      <div class="body" [style.max-height.px]="c.maxHeight" [style.grid-template-columns]="c.wide ? c.pictures + 'px 1fr' : null">
+        @let pictures = c.spot.pictures ?? [];
+        @let p = pictures[shown()];
+        <!-- The picture: a box of one size for every picture (sized for the largest), each whole in its top left corner,
+             so nothing moves when another is shown. No pictures yet: the empty box where they will go. -->
+        @if (p) {
+          <div class="frame" [style.height.px]="c.frameHeight"><img [src]="p.src" [alt]="p.alt" /></div>
+        } @else {
+          <div class="frame is-empty" [style.height.px]="c.frameHeight" aria-hidden="true"></div>
+        }
+        <div class="words">
+          <h3>{{ c.spot.title ?? c.spot.name }}</h3>
+          <!-- Its Romanian name, under a title in the story's words -->
+          @if (c.spot.title) { <p class="local-name">{{ c.spot.name }}</p> }
+          <!-- When it was built: the year or period, as big as the title -->
+          @if (c.spot.built) { <p class="built"><span class="visually-hidden">Built </span>{{ c.spot.built }}</p> }
+          <p class="text">{{ c.spot.text }}</p>
+          <!-- At the column's foot: who made the picture, as its licence asks (one line, kept even when this one has
+               none), then a small one of each picture, to switch between them (empty boxes before there are any) -->
+          <div class="foot">
+            @if (c.credits) { <p class="credit">{{ p?.credit ? 'Picture: ' + p!.credit : '' }}</p> }
+            @if (pictures.length > 1) {
+              <div class="thumbs">
+                @for (t of pictures; track t.src; let i = $index) {
+                  <button type="button" class="thumb" [class.is-shown]="i === shown()" [attr.aria-pressed]="i === shown()" [attr.aria-label]="t.alt" (click)="shown.set(i)">
+                    <img [src]="t.src" alt="" />
+                  </button>
+                }
+              </div>
+            } @else if (!pictures.length) {
+              <div class="thumbs" aria-hidden="true">@for (i of [0, 1, 2]; track i) { <span class="thumb is-empty"></span> }</div>
+            }
+          </div>
+        </div>
+      </div>
+      <button type="button" class="close" aria-label="Close" (click)="open.set(null)">×</button>
+    </aside>
+  }
+</div>

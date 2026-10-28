@@ -5,7 +5,7 @@ import type { Moment } from './moments';
 // A colour per province, so a state's pieces read apart (warm for the old principalities, cool for the lands that joined)
 export const PROVINCE_COLOURS: Record<string, string> = {
   'wallachia': '#f2b33d', 'moldavia': '#e07a3f', 'bukovina-south': '#b5523b', 'bukovina-north': '#8e3b46', 'dobruja': '#4f9d8a',
-  'cadrilater': '#8cc5b0', 'transylvania-north': '#6d8fc7', 'transylvania-south': '#9a7fc4', 'transylvania': '#7f87c6', 'transylvania-banat': '#7f87c6', 'transylvania-south-banat': '#9a7fc4', 'bukovina': '#a24a40', 'banat': '#5a6fa8',
+  'cadrilater': '#8cc5b0', 'transylvania-north': '#6d8fc7', 'transylvania-south': '#9a7fc4', 'transylvania': '#7f87c6', 'transylvania-banat': '#7f87c6', 'transylvania-south-banat': '#9a7fc4', 'moldavia-bukovina': '#e07a3f', 'moldavia-bukovina-south': '#e07a3f', 'bukovina': '#a24a40', 'banat': '#5a6fa8',
   'bessarabia': '#d4789c', 'budjak': '#e3a8bf', 'roman-dacia': '#c0574a', 'moldavia-1359': '#e07a3f'
 };
 

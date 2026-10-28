@@ -1,12 +1,18 @@
 <div class="nsc-moments-map" (wheel)="scroll($event)">
   <!-- The veil is left off when neighbours are shown: they are the point of the view -->
   <app-region-map [geography]="geography.base()" [territories]="territories()" [focus]="neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
-                  [arrows]="arrows()" [nameAt]="namePlaces" [arrowYear]="scaleYear()" [places]="places()" [view]="view()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
+                  [arrows]="arrows()" [nameAt]="namePlaces()" [nameText]="nameTexts()" [arrowYear]="scaleYear()" [places]="places()" [spots]="spots()" [coveredRight]="coveredRight()" [view]="view()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
   @if (!moment().state && !moment().zone) {
     @if (details()) { <p class="no-shape" [attr.data-status]="moment().status">{{ moment().status === 'trace' ? 'To trace' : 'Arrows, in the player' }}</p> }
   }
 
   <!-- Lesson 07: the moments down a time scale, at the right, with their titles (folds to the years) -->
+  <!-- A dev tool: the names on the map, to move and write -->
+  @if (nameEditor()) {
+    <app-name-editor [names]="regionMap()?.names() ?? []" [places]="namePlaces()" [texts]="nameTexts()" [projection]="regionMap()?.projection()"
+                     (placesChange)="setPlaces($event)" (textsChange)="setTexts($event)" (reset)="resetNames()" />
+  }
+
   @if (scale()) {
     <app-time-scale class="scale" [class.is-closed]="!scaleOpen()" [open]="scaleOpen()" (openChange)="setScaleOpen($event)"
                     [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" (scrubbed)="scaleYear.set($event)" />

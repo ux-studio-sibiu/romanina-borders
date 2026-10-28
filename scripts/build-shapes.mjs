@@ -1,7 +1,8 @@
 // Lesson 05: builds the map shapes that today's units (lesson 01) can make, from Roman Dacia to today.
 //   npm run data:shapes
 //
-// public/data/geography.topo.json → public/data/shapes.topo.json, five objects:
+// scripts/data/geography.topo.json (and geography-wide, for the empires past the area) → public/data/shapes.topo.json,
+// five objects:
 //   blocks:  the historical provinces, each a group of today's units merged into one shape (Wallachia, Bessarabia, …)
 //   states:  the lands at each moment, as a list of blocks merged into one outline (106, c. 1000, 1359, c. 1400, 1600,
 //            1812, 1859, 1878, 1913, 1918, 1940, today)
@@ -215,11 +216,15 @@ const ZONES = [
 // Provinces split only for the moments that need it (Transylvania by the 1940 line, Bukovina by the 1775–1918 one): where
 // a moment has both halves, it shows them as one province. Each state's `provinces` is its blocks with such pairs joined.
 // The Banat goes in with Transylvania wherever both are there (a child's map: one land west of the Carpathians, not
-// two), whole or, in 1940, with its southern half; tried in order, so the biggest join wins.
+// two), whole or, in 1940, with its southern half; tried in order, so the biggest join wins. Bukovina goes in with
+// Moldavia the same way (it was Moldavia's north until 1775), whole or its southern half, except at the moments in
+// `except`: 1918, whose story is that Bukovina itself voted to join.
 const COMBINED = [
   { id: 'transylvania-banat', name: 'Transylvania', nameRo: 'Transilvania', parts: ['transylvania-north', 'transylvania-south', 'banat'] },
   { id: 'transylvania', name: 'Transylvania', nameRo: 'Transilvania', parts: ['transylvania-north', 'transylvania-south'] },
   { id: 'transylvania-south-banat', name: 'Southern Transylvania', nameRo: 'Transilvania de Sud', parts: ['transylvania-south', 'banat'] },
+  { id: 'moldavia-bukovina', name: 'Moldavia', nameRo: 'Moldova', parts: ['moldavia', 'bukovina-south', 'bukovina-north'], except: ['1918'] },
+  { id: 'moldavia-bukovina-south', name: 'Moldavia', nameRo: 'Moldova', parts: ['moldavia', 'bukovina-south'], except: ['1918'] },
   { id: 'bukovina', name: 'Bukovina', nameRo: 'Bucovina', parts: ['bukovina-north', 'bukovina-south'] }
 ];
 // Merged shapes for drawing a land as one piece where the moments don't join it themselves: Bessarabia with the Budjak, as
@@ -227,7 +232,7 @@ const COMBINED = [
 const MERGED = [
   { id: 'bessarabia-all', name: 'Bessarabia', nameRo: 'Basarabia', parts: ['bessarabia', 'budjak'] }
 ];
-const provincesOf = ids => COMBINED.reduce((list, c) => c.parts.every(p => list.includes(p))
+const provincesOf = (ids, state) => COMBINED.reduce((list, c) => c.parts.every(p => list.includes(p)) && !c.except?.includes(state)
   ? list.flatMap(id => id === c.parts.find(p => list.includes(p)) ? [c.id] : c.parts.includes(id) ? [] : [id])
   : list, ids);
 
@@ -268,12 +273,12 @@ function west(a, b) { return [a, b, [14, b[1]], [14, a[1]]]; }
 function halves(id, unit, a, b) { return [{ id: `${id}-north`, unit, keep: north(a, b), line: [a, b] }, { id: `${id}-south`, unit, keep: south(a, b), line: [a, b] }]; }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const source = JSON.parse(await readFile(join(root, 'public/data/geography.topo.json'), 'utf8'));
+const source = JSON.parse(await readFile(join(root, 'scripts/data/geography.topo.json'), 'utf8'));
 const units = feature(source, source.objects.units).features;
 // The other countries, each one shape (Slovakia, Kosovo, Montenegro): for the empires
 const neighbours = feature(source, source.objects.neighbours).features;
 // The wide data's countries (npm run data:wide), for an empire reaching past the area
-const wide = JSON.parse(await readFile(join(root, 'public/data/geography-wide.topo.json'), 'utf8'));
+const wide = JSON.parse(await readFile(join(root, 'scripts/data/geography-wide.topo.json'), 'utf8'));
 const wideCountries = feature(wide, wide.objects.neighbours).features;
 
 // --- 1. The pieces, cut out of their units -------------------------------------------------------------------------------
@@ -315,7 +320,7 @@ const blocks = [
   ...[...COMBINED, ...MERGED].map(({ id, name, nameRo, parts }) => ({ type: 'Feature', id, properties: { name, nameRo, parts }, geometry: merged(parts) }))
 ];
 const states = STATES.map(({ id, label, name, blocks: ids, lands }) => ({
-  type: 'Feature', id, properties: { label, name, blocks: ids, provinces: provincesOf(ids), ...(lands && { lands }) }, geometry: merged(ids)
+  type: 'Feature', id, properties: { label, name, blocks: ids, provinces: provincesOf(ids, id), ...(lands && { lands }) }, geometry: merged(ids)
 }));
 const lands = LANDS.map(({ id, name, blocks: ids }) => ({ type: 'Feature', id, properties: { name, blocks: ids }, geometry: merged(ids) }));
 // Each part rounded off and turned the right way round on its own, then together as one shape

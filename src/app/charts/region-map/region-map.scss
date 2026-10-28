@@ -44,7 +44,7 @@
   .empire-outline { stroke-width: 2; stroke-dasharray: 7 4; }
   .empire-outline-halo { stroke: rgb(255 255 255 / 0.8); stroke-width: 4; }
   .empire-label {
-    font-family: var(--story-font); font-size: 15px; letter-spacing: 0.28em; text-transform: uppercase; text-anchor: middle;
+    font-family: var(--story-font); letter-spacing: 0.28em; text-transform: uppercase; text-anchor: middle; // its size: region-map.ts
     dominant-baseline: middle; stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke; pointer-events: none;
   }
 

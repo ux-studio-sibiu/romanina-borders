@@ -15,7 +15,7 @@
       </button>
     }
     @for (t of ticks(); track t.name) {
-      <button type="button" class="tick" [style.top.%]="t.x * 100" [title]="t.label + ': ' + t.name" tabindex="-1" (click)="clickTick(t.year)">
+      <button type="button" class="tick" [style.top.%]="t.x * 100" [title]="t.label + ': ' + t.name" tabindex="-1" (click)="clickTick(t.x)">
         <span class="mark"></span>@if (open()) {<span class="tick-year">{{ t.label }}</span><span class="tick-name">{{ t.name }}</span>}
       </button>
     }

@@ -36,14 +36,15 @@
     &.is-waiting .year { padding: 0 3px; border: 1px dashed var(--ink); }
   }
 
-  // A moment's own events: a short grey tick across the line, its year and name in grey beside it
+  // A moment's own events: a short thin ink dash, its year and name in ink beside it, the years in a column of their own
+  // (the names in another), set in from the moments' own labels (62px from the line), so they read as inside the moment
   .tick {
-    position: absolute; left: -5px; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding: 0;
-    border: 0; background: none; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
-    .mark { flex: none; width: 10px; height: 2px; background: var(--muted); }
-    .tick-year { @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
+    position: absolute; left: 62px; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; padding: 0;
+    border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+    .mark { flex: none; width: 6px; height: 1px; background: var(--ink); }
+    .tick-year { width: 28px; @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
     .tick-name { font-size: 0.75rem; }
-    &:hover { color: var(--fg); .mark { background: var(--fg); } }
+    &:hover .tick-name { text-decoration: underline; }
   }
 
   // The small play, at the right of the chosen moment's row

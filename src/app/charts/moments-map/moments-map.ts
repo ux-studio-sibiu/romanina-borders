@@ -5,8 +5,10 @@ import { TimeScale } from '../time-scale/time-scale';
 import { Geography } from '../../data/geography';
 import { type Moment, MOMENTS, type ShapeStatus, yearsAgo } from '../../data/moments';
 import { EMPIRE_COLOURS, EU_COLOUR, missingIds, PROVINCE_COLOURS, ZONE_COLOURS } from '../../data/palette';
-import { NAME_PLACES } from '../../data/name-places';
+import { NAME_PLACES, NAME_TEXTS } from '../../data/name-places';
+import { NameEditor, type NamePlaces, type NameTexts } from '../../tools/name-editor/name-editor';
 import { Shapes } from '../../data/shapes';
+import { SPOTS } from '../../data/spots';
 
 // The scroll wheel's step: how far to scroll (px), the pause that ends a gesture, the least time between steps (ms)
 const WHEEL_THRESHOLD = 40, WHEEL_GAP = 200, WHEEL_STEP = 700;
@@ -26,7 +28,7 @@ const STATUS_TEXT: Record<ShapeStatus, string> = {
 // caption tells the moment's story instead, for children (lesson 03).
 @Component({
   selector: 'app-moments-map',
-  imports: [RegionMap, MomentIcon, TimeScale],
+  imports: [RegionMap, MomentIcon, TimeScale, NameEditor],
   templateUrl: './moments-map.html',
   styleUrl: './moments-map.scss'
 })
@@ -34,6 +36,7 @@ export class MomentsMap {
   readonly details = input(true);
   readonly scrollNav = input(false); // the scroll wheel steps through the moments (the map page, which doesn't scroll itself)
   readonly scale = input(false); // lesson 07: the moments on a time scale too, in a panel of its own (an experiment, the map page)
+  readonly nameEditor = input(false); // lesson 08: a dev tool over the map, to move and write the names (the map page, in development)
 
   protected readonly geography = inject(Geography);
   protected readonly shapes = inject(Shapes);
@@ -46,7 +49,7 @@ export class MomentsMap {
   // Lesson 07: the year under the time scale's triangle, while it is dragged, played or left between two moments
   protected readonly scaleYear = signal<number | null>(null);
   protected readonly moment = computed(() => MOMENTS.find(m => m.id === this.momentId())!);
-  private readonly regionMap = viewChild(RegionMap);
+  protected readonly regionMap = viewChild(RegionMap);
 
   protected readonly state = computed(() => this.shapes.states().find(s => s.id === this.moment().state));
   // The provinces to show: the state's blocks, with Transylvania's or Bukovina's halves joined where it has both
@@ -63,6 +66,8 @@ export class MomentsMap {
   // Lesson 06: the moment's own view
   protected readonly view = computed(() => this.moment().view ?? null);
   protected readonly places = computed<MapPlace[]>(() => (this.moment().places ?? []).map(p => ({ id: `${this.moment().id}-${p.name}`, ...p })));
+  // Lesson 08: the moment's curiosities, by id (data/spots.ts)
+  protected readonly spots = computed(() => (this.moment().spots ?? []).map(id => SPOTS[id]).filter(Boolean));
   // Lesson 06: the moment's whole countries (the EU's members), from the map's own countries: filled and named
   protected readonly countries = computed<Territory[]>(() => {
     const land = this.geography.base()?.land.features ?? [];
@@ -86,17 +91,19 @@ export class MomentsMap {
     });
   }
 
-  // Lesson 06: a moment with another view zooms; the map keeps a copy of the old drawings first, to cross-fade them. A
-  // zoom out past the area over the satellite picture waits until the wide picture is ready: started earlier, its edges
-  // would show blank, then the picture pop in, mid-zoom.
+  // Lesson 06: a moment with another view zooms; the map keeps a copy of the old drawings first, to fade them out. With
+  // the same view (lesson 08), only when stepped to with the scroll wheel (`fade`): what changed fades out, then in;
+  // a click shows the new moment at once. A zoom out past the area over the satellite picture waits until the wide
+  // picture is ready: started earlier, its edges would show blank, then the picture pop in, mid-zoom.
   private chosen = 0;
-  protected async choose(moment: Moment) {
+  protected async choose(moment: Moment, fade = false) {
     const ticket = ++this.chosen;
     if (needsWide(moment.view) && !moment.plain) {
       await this.regionMap()?.widePicture();
       if (ticket !== this.chosen) return; // another moment was chosen meanwhile
     }
-    if (JSON.stringify(moment.view ?? null) !== JSON.stringify(this.view())) this.regionMap()?.holdDrawings();
+    const zooms = JSON.stringify(moment.view ?? null) !== JSON.stringify(this.view());
+    if (moment.id !== this.momentId() && (zooms || fade)) this.regionMap()?.holdDrawings();
     this.momentId.set(moment.id);
   }
 
@@ -115,18 +122,30 @@ export class MomentsMap {
     if (Math.abs(w.sum) < WHEEL_THRESHOLD) return;
     const i = MOMENTS.findIndex(m => m.id === this.momentId()) + Math.sign(w.sum);
     w.used = true; w.stepped = now; w.sum = 0;
-    if (i >= 0 && i < MOMENTS.length) this.choose(MOMENTS[i]);
+    if (i >= 0 && i < MOMENTS.length) this.choose(MOMENTS[i], true);
   }
 
   // Lesson 07: whether the time scale is open (or folded to the years), kept across reloads
   protected readonly scaleOpen = signal(readScaleOpen());
+  // Lesson 08: how much of the map's right edge the time scale covers (its widths and breakpoint: moments-map.scss), kept
+  // clear of the spots' cards
+  private readonly scaleShown = mediaSignal('(width >= 760px)');
+  protected readonly coveredRight = computed(() => this.scale() && this.scaleShown() ? (this.scaleOpen() ? 300 : 150) : 0);
   protected setScaleOpen(open: boolean) {
     this.scaleOpen.set(open);
     try { localStorage.setItem(SCALE_OPEN_KEY, String(open)); } catch { /* not kept: fine */ }
   }
 
-  // The names placed by hand (data/name-places.ts)
-  protected readonly namePlaces = NAME_PLACES;
+  // The names placed and written by hand (data/name-places.ts), and over them the name editor's (a dev tool), kept in
+  // localStorage until they are copied into the data. Only the edits that differ from the data are kept, so once copied
+  // in they go, and a later change to the data shows rather than staying hidden under an old edit.
+  private readonly editedPlaces = signal<NamePlaces>(readEdits(NAMES_KEY, NAME_PLACES));
+  private readonly editedTexts = signal<NameTexts>(readEdits(TEXTS_KEY, NAME_TEXTS));
+  protected readonly namePlaces = computed(() => ({ ...NAME_PLACES, ...this.editedPlaces() }));
+  protected readonly nameTexts = computed(() => ({ ...NAME_TEXTS, ...this.editedTexts() }));
+  protected setPlaces(places: NamePlaces) { this.editedPlaces.set(save(NAMES_KEY, unlike(places, NAME_PLACES))); }
+  protected setTexts(texts: NameTexts) { this.editedTexts.set(save(TEXTS_KEY, unlike(texts, NAME_TEXTS))); }
+  protected resetNames() { this.setPlaces({}); this.setTexts({}); }
 
   // On intent (the pointer over, or the keyboard on, a zoomed-out moment's button): fetch the wide picture now, so the
   // zoom out finds it ready (the map fetches it anyway, soon after its own, unless the browser asks to save data)
@@ -159,6 +178,31 @@ export class MomentsMap {
         : [{ kind: 'outline' as const, id: `${state.id}-outline`, geometry: state }])
     ];
   });
+}
+
+// The name editor's places and words, kept across reloads (a dev tool): read without those the data has caught up with
+const NAMES_KEY = 'romanianBorders.namePlaces', TEXTS_KEY = 'romanianBorders.nameTexts';
+function readEdits<T>(key: string, data: Record<string, T>): Record<string, T> {
+  let stored: Record<string, T> = {};
+  try { stored = JSON.parse(localStorage.getItem(key) ?? '{}'); } catch { /* none kept */ }
+  return save(key, unlike(stored, data));
+}
+function save<T extends object>(key: string, value: T) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not kept: fine */ }
+  return value;
+}
+// The edits that differ from the data: a place to two decimals (about a kilometre, as the editor copies it), a text exactly
+function unlike<T>(edits: Record<string, T>, data: Record<string, T>): Record<string, T> {
+  const same = (a: unknown, b: unknown) => JSON.stringify(rounded(a)) === JSON.stringify(rounded(b));
+  return Object.fromEntries(Object.entries(edits).filter(([id, value]) => !same(value, data[id])));
+}
+function rounded(value: unknown) { return Array.isArray(value) ? value.map(v => Math.round(v * 100) / 100) : value; }
+
+// Whether a media query matches, as a signal kept up to date
+function mediaSignal(query: string) {
+  const media = matchMedia(query), matches = signal(media.matches);
+  media.addEventListener('change', e => matches.set(e.matches));
+  return matches.asReadonly();
 }
 
 // Lesson 07: the time scale open or folded, open at first

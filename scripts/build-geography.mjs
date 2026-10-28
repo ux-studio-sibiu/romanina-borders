@@ -2,9 +2,11 @@
 //   npm run data:geography            (uses the cached downloads)
 //   npm run data:geography -- --fresh (downloads again)
 //
-// Natural Earth 1:10m (public domain): admin-1 units, rivers, the Black Sea → public/data/geography.topo.json
+// Natural Earth 1:10m (public domain): admin-1 units, rivers, the Black Sea → scripts/data/geography.topo.json
 //   npm run data:geography:wide       the wide data (--wide): the bigger extent `wide` in region.json, every country one
-//                                     shape, simplified more → public/data/geography-wide.topo.json (lesson 06's views)
+//                                     shape, simplified more → scripts/data/geography-wide.topo.json
+//   npm run data:background           what the map draws (--background, lesson 08) → public/data/background.topo.json
+// The first two only feed the shapes' build (build-shapes.mjs): they stay out of public/, so the site doesn't ship them.
 // Runs in Node, at build time, never in the browser. The output is committed, so the app never depends on a third-party server.
 // Modelled on data-viz's scripts/build-boundaries.mjs.
 
@@ -61,7 +63,7 @@ const FAR = 20;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cacheDir = join(root, 'scripts/.cache');
-const outDir = join(root, 'public/data');
+const outDir = join(root, BACKGROUND ? 'public/data' : 'scripts/data');
 
 // --- 1. Download (once) -------------------------------------------------------------------------
 const source = {};

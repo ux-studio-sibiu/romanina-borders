@@ -42,6 +42,8 @@ export interface Moment {
   neighbours?: string[];
   // Places to mark, a dot and a name each
   places?: { name: string; at: [number, number] }[];
+  // Curiosities to click (lesson 08): spot ids in data/spots.ts, each a marker with a picture and a few sentences behind it
+  spots?: string[];
   // Lands taken away at this moment, drawn dotted next to what is left (blocks in shapes.topo.json), each with who took it
   // (or, the same way, a land beside them that isn't theirs, with whose it is: Transylvania c. 1400)
   lost?: { block: string; to: string }[];
@@ -71,17 +73,18 @@ export const MOMENTS: Moment[] = [
     zone: 'burebista',
     view: ANCIENT_VIEW,
     neighbours: ['roman-republic', 'celts', 'thracians', 'bastarnae', 'sarmatians', 'scythians', 'bosporan'],
+    // Sarmizegetusa, the kings' capital: a spot (a marker to click), not a place
+    spots: ['sarmizegetusa-regia'],
+    // Only the Greek cities on today's Romanian coast: kept simple
     places: [
-      { name: 'Sarmizegetusa', at: [23.31, 45.62] }, { name: 'Histria', at: [28.77, 44.55] }, { name: 'Tomis', at: [28.65, 44.17] },
-      { name: 'Callatis', at: [28.6, 43.81] }, { name: 'Odessos', at: [27.91, 43.2] }, { name: 'Apollonia', at: [27.7, 42.43] },
-      { name: 'Tyras', at: [30.35, 46.2] }, { name: 'Olbia', at: [31.9, 46.69] }, { name: 'Byzantion', at: [28.98, 41.01] }
+      { name: 'Histria', at: [28.77, 44.55] }, { name: 'Tomis', at: [28.65, 44.17] }, { name: 'Callatis', at: [28.6, 43.81] }
     ],
     status: 'built', note: "Approximate, a soft zone: Burebista's kingdom from the middle Danube to the Black Sea coast and the Balkan range, a hand-placed ring with a blurred edge. It stands for the Getae and Dacians before him too."
   },
   {
     id: 'romans', label: '101', year: 106, title: 'The Romans in Dacia', icon: 'eagle',
     text: 'The Roman emperor Trajan fought two wars against the Dacian king Decebalus. In 106 the Romans won, and much of Dacia became part of the Roman Empire for about 165 years. Romanian comes from Latin, the language the Romans spoke.',
-    state: '106', empires: ['roman-empire'], zone: 'burebista', view: ANCIENT_VIEW,
+    state: '106', empires: ['roman-empire'], zone: 'burebista', view: ANCIENT_VIEW, spots: ['drobeta-bridge', 'ulpia-traiana'],
     status: 'built', note: 'Approximate: east of the Olt it reaches the Limes Transalutanus, drawn as an approximate line from the Danube near Flămânda to Rucăr.'
   },
   {
@@ -110,19 +113,20 @@ export const MOMENTS: Moment[] = [
   {
     id: 'hungary', label: 'c. 1000', year: 1000, title: 'Transylvania in the Kingdom of Hungary', icon: 'crown',
     text: 'Step by step, Transylvania became part of the Kingdom of Hungary. Romanians, Hungarians and, later, Saxons who came from Germany all lived there together.',
-    state: 'c1000', empires: ['hungary'],
+    state: 'c1000', empires: ['hungary'], spots: ['alba-iulia-cathedral', 'dabaca', 'biharea', 'cisnadioara', 'basarabi', 'capidava'],
     status: 'built', note: 'It joined gradually, over the 10th–13th centuries.'
   },
   {
     id: 'founding', label: '1330–1359', year: 1330, title: 'Wallachia and Moldavia are born', icon: 'castle',
     text: 'In 1330, Prince Basarab won a great battle at Posada, and Wallachia became a free country. In 1359, Bogdan made Moldavia free too.',
-    state: '1359', empires: ['hungary'],
+    state: '1359', empires: ['hungary'], spots: ['curtea-de-arges', 'campulung', 'severin', 'bogdana', 'baia', 'densus', 'bogdan-voda', 'rasnov', 'sibiu', 'cluj-st-michael', 'alba-iulia-cathedral'],
     status: 'built', note: "Basarab's Wallachia (1330) and Bogdan's Moldavia (1359). Approximate: early Moldavia's southern edge is an approximate line from the Carpathians above Roman to the Prut above Iași."
   },
   {
     id: 'princes', label: '1400–1504', year: 1457, title: 'Mircea, Vlad and Stephen', icon: 'shield',
     text: 'Brave princes like Mircea the Elder, Vlad III and Stephen the Great defended their lands against the mighty Ottoman Empire. Stephen built many churches and monasteries, and you can still visit them today.',
     state: 'c1400', empires: ['hungary', 'ottoman'], lost: [{ block: 'transylvania-banat', to: 'in the Kingdom of Hungary' }],
+    spots: ['cozia', 'poenari', 'chindia', 'snagov', 'bran', 'corvin', 'sighisoara', 'neamt', 'putna', 'voronet', 'hotin', 'soroca', 'cetatea-alba'],
     status: 'built', note: 'Mircea the Elder, Vlad the Impaler and Stephen the Great, between Hungary and the Ottomans.'
   },
   {

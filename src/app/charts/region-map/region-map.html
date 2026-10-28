@@ -12,10 +12,10 @@
       <defs>
         <!-- Lesson 06: the soft zones' fuzzy edge: the zone shrunk first (erode), then blurred wide, so the colour fades in
              over a broad band inside its edge; the filters' boxes are grown so the blur isn't cut off. -->
-        <filter [attr.id]="clipId + '-soft'" x="-20%" y="-20%" width="140%" height="140%">
+        <filter [attr.id]="idPrefix + '-soft'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="16" /><feGaussianBlur stdDeviation="26" />
         </filter>
-        <filter [attr.id]="clipId + '-soft-light'" x="-20%" y="-20%" width="140%" height="140%">
+        <filter [attr.id]="idPrefix + '-soft-light'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="4" /><feGaussianBlur stdDeviation="9" />
         </filter>
         <!-- Lesson 05: each empire's hatch: a tint of its colour and a light diagonal line every 7px, light so it shows over
@@ -28,7 +28,7 @@
         }
       </defs>
       @for (e of empires(); track e.id) { <path class="empire" [attr.d]="e.d" [style.fill]="'url(#' + e.pattern + ')'" /> }
-      @for (z of zones(); track z.id) { <path class="zone" [class.is-light]="z.light" [attr.d]="z.d" [style.--territory]="z.colour" [attr.filter]="'url(#' + clipId + (z.light ? '-soft-light)' : '-soft)')" /> }
+      @for (z of zones(); track z.id) { <path class="zone" [class.is-light]="z.light" [attr.d]="z.d" [style.--territory]="z.colour" [attr.filter]="'url(#' + idPrefix + (z.light ? '-soft-light)' : '-soft)')" /> }
       @for (t of fills(); track t.id) { <path class="territory" [attr.d]="t.d" [style.--territory]="t.colour" /> }
     </svg>
 
@@ -41,13 +41,13 @@
     <svg #mapSvg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()" [class.is-plain]="plain()">
       <defs>
         <!-- The veil round a soft zone, grown by the zone's erode (dilate) and blurred the same way, so the two meet -->
-        <filter [attr.id]="clipId + '-soft-veil'" x="-20%" y="-20%" width="140%" height="140%">
+        <filter [attr.id]="idPrefix + '-soft-veil'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="dilate" radius="16" /><feGaussianBlur stdDeviation="26" />
         </filter>
       </defs>
       <!-- Lesson 05: everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
            and every name stay above it -->
-      @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" [attr.filter]="softFocus() ? 'url(#' + clipId + '-soft-veil)' : null" /> }
+      @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" [attr.filter]="softFocus() ? 'url(#' + idPrefix + '-soft-veil)' : null" /> }
       <!-- A border drawn twice: a wide white line, then the black one on it, so it reads over any colour -->
       @for (e of empires(); track e.id) { <path class="empire-outline-halo" [attr.d]="e.d" /> }
       @for (e of empires(); track e.id) { <path class="empire-outline" [attr.d]="e.d" [style.stroke]="e.colour" /> }
@@ -60,8 +60,8 @@
       <!-- Lesson 07: or set by a year (the time scale's), arrowsAt -->
       @let at = arrowsAt();
       @for (a of arrowPaths(); track a.id; let i = $index) {
-        <mask [attr.id]="clipId + '-arrow-' + i"><path class="arrow-reveal" [attr.d]="a.line" pathLength="1" [style.stroke-dashoffset]="at ? 1 - at.states[i].drawn : null" /></mask>
-        <path class="arrow" [attr.d]="a.d" [attr.mask]="'url(#' + clipId + '-arrow-' + i + ')'" [style.opacity]="at ? at.states[i].opacity : null" />
+        <mask [attr.id]="idPrefix + '-arrow-' + i"><path class="arrow-reveal" [attr.d]="a.line" pathLength="1" [style.stroke-dashoffset]="at ? 1 - at.states[i].drawn : null" /></mask>
+        <path class="arrow" [attr.d]="a.d" [attr.mask]="'url(#' + idPrefix + '-arrow-' + i + ')'" [style.opacity]="at ? at.states[i].opacity : null" />
       }
 
       <!-- Lesson 05: the territories' names, over every line -->
@@ -78,12 +78,15 @@
         <text class="arrow-year" [attr.x]="size().width / 2" y="58" [style.opacity]="at ? (i === at.caption ? 1 : 0) : null">{{ a.when ? a.when + ': ' : '' }}{{ a.name }}</text>
       }
       @for (e of empires(); track e.id) {
-        <text class="empire-label" [attr.x]="e.x" [attr.y]="e.y" [style.fill]="e.ink">
+        <text class="empire-label" [attr.x]="e.x" [attr.y]="e.y" [style.fill]="e.ink" [style.font-size.px]="empireSize()">
           @for (line of e.lines; track $index) { <tspan [attr.x]="e.x" [attr.dy]="$index ? '1.2em' : (e.lines.length > 1 ? '-0.6em' : '0')">{{ line }}</tspan> }
         </text>
       }
       @for (l of lost(); track l.id) {
-        <text class="lost-label" [attr.x]="l.x" [attr.y]="l.y"><tspan [attr.x]="l.x" dy="-0.2em">{{ l.name }}</tspan><tspan class="lost-note" [attr.x]="l.x" dy="1.3em">{{ l.note }}</tspan></text>
+        <text class="lost-label" [attr.x]="l.x" [attr.y]="l.y">
+          @for (line of l.lines; track $index) { <tspan [attr.x]="l.x" [attr.dy]="$index ? '1.1em' : (-0.2 - 0.55 * (l.lines.length - 1)) + 'em'">{{ line }}</tspan> }
+          <tspan class="lost-note" [attr.x]="l.x" dy="1.3em">{{ l.note }}</tspan>
+        </text>
       }
       @for (l of labels(); track l.id) {
         <text class="territory-label" [attr.x]="l.x" [attr.y]="l.y" [style.font-size.px]="l.size" [style.fill]="l.colour">
@@ -93,5 +96,8 @@
     </svg>
     <!-- Lesson 08: and the rest of its drawings -->
     <svg #heldMap class="held" [attr.viewBox]="viewBox()" aria-hidden="true"></svg>
+
+    <!-- Lesson 08: the spots, markers to click for a picture and a few sentences -->
+    @if (spotPoints().length) { <app-map-spots [spots]="spotPoints()" [width]="size().width" [height]="size().height" [coveredRight]="coveredRight()" /> }
   }
 </figure>

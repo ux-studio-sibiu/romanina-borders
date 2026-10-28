@@ -3,6 +3,8 @@ import { geoConicConformal, geoGraticule, geoPath, type GeoContext, type GeoPath
 import type { Geometry, Polygon } from 'geojson';
 import type { BaseGeography } from '../../data/geography';
 import region from '../../data/region.json';
+import type { Spot } from '../../data/spots';
+import { MapSpots } from '../map-spots/map-spots';
 import { Backdrop, type BackdropStyle } from './backdrop-style';
 
 // Lesson 05–06: a territory drawn on the map, by kind:
@@ -35,7 +37,9 @@ const ZOOM_SECONDS = 0.85;
 // Lesson 08: and the moment's drawings round it, so only the background moves while it zooms: the old drawings fade out
 // over FADE_OUT, the camera starts ZOOM_DELAY in; once it has stopped, FADE_GAP later, the new drawings fade in over FADE_IN
 const FADE_OUT = 0.2, ZOOM_DELAY = 0.1, FADE_GAP = 0.1, FADE_IN = 0.15;
-const TOTAL = ZOOM_DELAY + ZOOM_SECONDS + FADE_GAP + FADE_IN;
+// Lesson 08: between two moments with the same view, no zoom: the old drawings fade out, and STILL_GAP after that the new
+// fade in
+const STILL_GAP = 0.05;
 // Lesson 08: the drawings' <svg>s reach past the window by this much on every side (a fraction of its size), so they
 // still cover it while the camera finishes, a little out from where they are drawn
 const BLEED = 0.1;
@@ -100,6 +104,7 @@ type Scene = { look: Look; units: number };
 // on canvases, from the plane, by a camera (above).
 @Component({
   selector: 'app-region-map',
+  imports: [MapSpots],
   templateUrl: './region-map.html',
   styleUrl: './region-map.scss',
   // The backdrop tuner's numbers the styles read, as custom properties (the canvases read the rest themselves)
@@ -120,13 +125,17 @@ export class RegionMap {
   readonly arrows = input<MapArrow[]>([]); // lesson 06: movement across the map
   readonly arrowYear = input<number | null>(null); // lesson 07: the arrows as at this year, instead of looping
   readonly nameAt = input<Record<string, [number, number]>>({}); // lesson 07: names placed by hand, by id, in [lon, lat]
+  readonly nameText = input<Record<string, string>>({}); // lesson 08: names written by hand, by id, their lines split at \n
   readonly places = input<MapPlace[]>([]); // lesson 06: dots with names
+  readonly spots = input<Spot[]>([]); // lesson 08: curiosities to click, a picture and a few sentences each
+  readonly coveredRight = input(0); // lesson 08: px along the right edge under the parent's own panel, kept clear of spot cards
   readonly view = input<Extent | null>(null); // lesson 06: a box to fit instead of the core (a moment zoomed out)
 
   protected readonly backdrop = inject(Backdrop);
 
-  // The ids in the <defs> must be unique in the document, in case a lesson page ever shows a second map
-  protected readonly clipId = `region-clip-${++maps}`;
+  // The start of every id this map gives its drawings (the blur filters, the hatches, the arrows' masks): unique in the
+  // document, in case a lesson page ever shows a second map
+  protected readonly idPrefix = `region-map-${++maps}`;
 
   // The host's size in CSS pixels, from a ResizeObserver. A signal, so a resize re-runs the computeds below (zoneless:
   // a plain field set from the observer's callback would never reach the screen).
@@ -170,8 +179,10 @@ export class RegionMap {
 
     // Lesson 06: when the view changes, zoom from the old one to the new: once the new view is in the page (after the
     // render, still before the browser paints), so the zoom fades in the new drawings, not the old ones
+    // Lesson 08: and when the drawings were held for another moment with the same view, fade from them to the new
     afterRenderEffect(() => {
       const camera = this.camera(), scene = this.scene(), { width, height } = this.size(), key = JSON.stringify(this.view());
+      this.heldVersion();
       untracked(() => this.move(camera, scene, key, width, height));
     });
   }
@@ -201,23 +212,29 @@ export class RegionMap {
   private readonly mapSvg = viewChild<ElementRef<SVGSVGElement>>('mapSvg');
   private readonly heldFillsSvg = viewChild<ElementRef<SVGSVGElement>>('heldFills');
   private readonly heldMapSvg = viewChild<ElementRef<SVGSVGElement>>('heldMap');
+  private readonly spotsLayer = viewChild(MapSpots, { read: ElementRef<HTMLElement> });
   private svgs() { return [this.fillsSvg(), this.mapSvg()].flatMap(r => r ? [r.nativeElement] : []); }
   private heldSvgs() { return [this.heldFillsSvg(), this.heldMapSvg()].flatMap(r => r ? [r.nativeElement] : []); }
 
   private last: { key: string; width: number; height: number; camera: Camera; scene: Scene } | null = null; // the view drawn
-  private motion: { from: Camera; to: Camera; was: Scene; start: number; held: Camera | null; fades: Animation[] } | null = null;
+  // A move's timeline, in seconds: the camera from `delay` for `zoom` (0: it doesn't move), the new drawings in from
+  // `fadeIn`, all of it over by `total`
+  private motion: { from: Camera; to: Camera; was: Scene; start: number; delay: number; zoom: number; total: number; held: Camera | null; fades: Animation[] } | null = null;
   private shown: Camera | null = null; // the camera on screen now
-  private held: { at: Camera; layers: { html: string; classes: string; opacity: number }[] } | null = null;
+  private held: { at: Camera; layers: HeldLayer[] } | null = null;
+  private readonly heldVersion = signal(0); // counts the holds, so a hold with no change of view still moves (fades)
   private frameId = 0;
   private arrowAnimations: Animation[] = [];
 
-  // Lesson 06: called by the parent just before it changes the view: a copy of what is drawn now, to fade out as the zoom
-  // starts (the background cross-fades itself, on the canvases). With its own patterns, filters and masks, renamed, as
-  // the next moment may not have them; from wherever its fade has got to, if a zoom is still under way.
+  // Lesson 06: called by the parent just before it changes the moment: a copy of what is drawn now, to fade out as the zoom
+  // starts, or, with the same view, before the new drawings fade in (the background cross-fades itself, on the
+  // canvases). With its own patterns, filters and masks, renamed, as the next moment may not have them; from wherever
+  // its fade has got to, if a move is still under way.
   holdDrawings() {
     this.held = null;
     if (!this.last || reducedMotion()) return;
-    this.held = { at: this.last.camera, layers: this.svgs().map(svg => ({ html: heldCopy(svg), classes: svg.getAttribute('class') ?? '', opacity: Number(getComputedStyle(svg).opacity) })) };
+    this.held = { at: this.last.camera, layers: this.svgs().map(heldLayer) };
+    this.heldVersion.update(v => v + 1);
   }
 
   private move(camera: Camera, scene: Scene, key: string, width: number, height: number) {
@@ -226,22 +243,37 @@ export class RegionMap {
     this.held = null;
     const from = this.shown;
     this.endMotion();
-    if (!was || !from || was.width !== width || was.height !== height || (was.key === key && was.scene.look === scene.look) || reducedMotion() || !svgs.length) {
+    const zooms = !!was && (was.key !== key || was.scene.look !== scene.look);
+    if (!was || !from || was.width !== width || was.height !== height || (!zooms && !held) || reducedMotion() || !svgs.length) {
       this.shown = camera;
       return this.request();
     }
-    const timing = { duration: TOTAL * 1000, easing: 'linear' };
+    // The timeline: a zoom, or, with the same view, only the fades, one after the other
+    const delay = zooms ? ZOOM_DELAY : 0, zoom = zooms ? ZOOM_SECONDS : 0;
+    const fadeIn = zooms ? delay + zoom + FADE_GAP : FADE_OUT + STILL_GAP, total = fadeIn + FADE_IN;
+    const timing = { duration: total * 1000, easing: 'linear' };
     // The new drawings hidden until just after the camera has stopped. The fade has no end keyframe and no fill: it eases
-    // to the <svg>'s own opacity and then is simply gone, so nothing changes on screen when it ends.
-    const fades = svgs.map(svg => svg.animate([{ opacity: 0 }, { opacity: 0, offset: (ZOOM_DELAY + ZOOM_SECONDS + FADE_GAP) / TOTAL }], timing));
-    // The old drawings, in layers of their own, faded out as the camera starts
-    if (held) this.heldSvgs().forEach((svg, i) => {
-      const layer = held.layers[i];
-      svg.setAttribute('class', `${layer.classes} held`);
-      svg.innerHTML = layer.html;
-      fades.push(svg.animate([{ opacity: layer.opacity }, { opacity: 0, offset: FADE_OUT / TOTAL }, { opacity: 0 }], { ...timing, fill: 'forwards' }));
+    // to the drawing's own opacity and then is simply gone, so nothing changes on screen when it ends. After a zoom the
+    // whole layer fades in; with the same view only what is new in it, piece by piece: a drawing the last moment had too
+    // (the same markup: a province both share) just stays, so what was added or taken away is what moves.
+    // The spots with them (plain HTML, not moved: hidden until then, the old ones gone at once)
+    const hidden = [{ opacity: 0 }, { opacity: 0, offset: fadeIn / total }];
+    const spots = this.spotsLayer()?.nativeElement;
+    const fades = spots ? [spots.animate(hidden, timing)] : [];
+    svgs.forEach((svg, i) => {
+      if (zooms || !held) { fades.push(svg.animate(hidden, timing)); return; }
+      const had = new Set(held.layers[i].pieces);
+      for (const drawing of [...svg.children].filter(e => e.tagName !== 'defs' && !had.has(e.outerHTML))) fades.push(drawing.animate(hidden, timing));
     });
-    this.motion = { from, to: camera, was: was.scene, start: performance.now(), held: held?.at ?? null, fades };
+    // The old drawings, in layers of their own, faded out as the camera starts (with the same view, only those the new
+    // moment doesn't have)
+    if (held) this.heldSvgs().forEach((svg, i) => {
+      const layer = held.layers[i], has = zooms ? null : new Set(pieces(svgs[i]));
+      svg.setAttribute('class', `${layer.classes} held`);
+      svg.innerHTML = renamed(layer.defs + layer.pieces.filter(p => !has?.has(p)).join(''), layer.ids);
+      fades.push(svg.animate([{ opacity: layer.opacity }, { opacity: 0, offset: FADE_OUT / total }, { opacity: 0 }], { ...timing, fill: 'forwards' }));
+    });
+    this.motion = { from, to: camera, was: was.scene, start: performance.now(), delay, zoom, total, held: held?.at ?? null, fades };
     this.step(performance.now()); // the first frame now, before the browser paints
   }
 
@@ -262,8 +294,8 @@ export class RegionMap {
     const m = this.motion;
     if (m) {
       const s = (now - m.start) / 1000;
-      if (s < TOTAL) {
-        p = ease(Math.max(0, Math.min(1, (s - ZOOM_DELAY) / ZOOM_SECONDS)));
+      if (s < m.total) {
+        p = m.zoom ? ease(Math.max(0, Math.min(1, (s - m.delay) / m.zoom))) : 1;
         camera = between(m.from, m.to, p);
         was = m.was;
         for (const svg of this.svgs()) svg.style.transform = relative(camera, last.camera);
@@ -385,7 +417,7 @@ export class RegionMap {
     // on its side instead of disappearing
     const { width, height } = this.size();
     const x = Math.max(90, Math.min(width - 90, ax)), y = Math.max(56, Math.min(height - 28, ay)); // 56: under the header links
-    return { id: t.id, colour: t.colour ?? '#6b6862', ink: darken(t.colour ?? '#6b6862', 0.35), light: lighten(t.colour ?? '#6b6862', 0.55), d: this.draw(t.geometry), pattern: `${this.clipId}-hatch-${t.id}`, lines: twoLines(t.label ?? ''), x, y };
+    return { id: t.id, colour: t.colour ?? '#6b6862', ink: darken(t.colour ?? '#6b6862', 0.35), light: lighten(t.colour ?? '#6b6862', 0.55), d: this.draw(t.geometry), pattern: `${this.idPrefix}-hatch-${t.id}`, lines: this.lines(t.id, t.label ?? ''), x, y };
   }));
 
   // Names for the filled territories that have one: on the largest part (a small island or a sliver never gets the label),
@@ -393,16 +425,29 @@ export class RegionMap {
   // darkened by a third so a pale yellow still reads; a white halo (paint-order) keeps it off the picture behind.
   // Lesson 06: the lands a moment takes away, each a dotted edge and, at its centre, its name and who took it
   protected readonly lost = computed(() => this.ofKind('lost').map(t => {
-    const path = this.path(), [x, y] = path.centroid(largestPart(t.geometry, path));
-    return { id: t.id, d: this.draw(t.geometry), name: t.label, note: t.note, x, y };
+    const path = this.path(), at = this.nameAt()[t.id], [x, y] = (at && this.projection()(at)) ?? path.centroid(largestPart(t.geometry, path));
+    return { id: t.id, d: this.draw(t.geometry), lines: this.lines(t.id, t.label, false), note: t.note, x, y };
   }));
 
   protected readonly labels = computed(() => [...this.ofKind('province'), ...this.ofKind('zone')].filter(t => t.label).map(t => {
     const path = this.path(), main = largestPart(t.geometry, path), at = this.nameAt()[t.id];
     const [x, y] = (at && this.projection()(at)) ?? path.centroid(main);
     const size = Math.max(12, Math.min(24, Math.sqrt(path.area(main)) / 8));
-    return { id: t.id, x, y, size, lines: twoLines(t.label!), colour: t.colour ? darken(t.colour, 0.35) : undefined };
+    return { id: t.id, x, y, size, lines: this.lines(t.id, t.label!), colour: t.colour ? darken(t.colour, 0.35) : undefined };
   }));
+
+  // Lesson 08: an empire's name as big as the biggest land's name beside it (Roman Dacia's, in 101), so the two read as
+  // equals; 15px when it has none
+  protected readonly empireSize = computed(() => Math.max(15, ...this.labels().map(l => l.size)));
+
+  // Lesson 08: every name on the map, where it is drawn and as written: the name editor's handles (public)
+  readonly names = computed(() => [...this.labels(), ...this.empires(), ...this.lost()].map(n => ({ id: n.id, text: n.lines.join('\n'), x: n.x, y: n.y })));
+
+  // A name's lines: as written by hand (split at its line breaks), or its land's name, long ones in two (`split`)
+  private lines(id: string, name: string, split = true) {
+    const text = this.nameText()[id];
+    return text !== undefined ? text.split('\n') : split ? twoLines(name) : [name];
+  }
 
   // The veil outside the focus: a box with the focus cut out (even-odd: the focus's rings make holes in it), so the
   // neighbours, their borders and the empires' hatching recede behind the story's land. The box is the <svg>'s, bleed
@@ -413,6 +458,12 @@ export class RegionMap {
     const { width: w, height: h } = this.size(), m = 2 * BLEED;
     return `M${-m * w} ${-m * h}H${(m + 1) * w}V${(m + 1) * h}H${-m * w}Z${this.draw(focus)}`;
   });
+
+  // Lesson 08: the spots, projected
+  protected readonly spotPoints = computed(() => this.spots().map(s => {
+    const [x, y] = this.projection()(s.at) ?? [0, 0];
+    return { ...s, x, y };
+  }));
 
   // Lesson 06: the places, projected
   protected readonly placePoints = computed(() => this.places().map(p => {
@@ -554,13 +605,36 @@ function relative(camera: Camera, at: Camera) {
   return `matrix(${r}, 0, 0, ${r}, ${camera.x - r * at.x}, ${camera.y - r * at.y})`;
 }
 
-// A drawing layer's content, as markup, with every id (and every url(#id) or #id pointing at one) renamed, so the copy
-// keeps its own patterns, filters and masks beside the new drawings'
-function heldCopy(svg: SVGSVGElement) {
-  let html = svg.innerHTML;
-  for (const { id } of svg.querySelectorAll('[id]')) {
-    html = html.replace(new RegExp(`(id="|#)${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=["')&])`, 'g'), `$1${id}-held`);
+// A drawing layer's content, as markup: its <defs> and each drawing apart (its markup is also how it is told from the
+// next moment's: the same markup, the same drawing), and the ids in it, to rename in the copy (renamed()). The arrows,
+// their names and captions are drawn on by Web Animations, which markup doesn't keep: their state now (how much of each
+// is drawn, how strongly it shows) is written on them for the copy, then taken off again, so the copy doesn't flash
+// every arrow at once.
+type HeldLayer = { classes: string; opacity: number; defs: string; pieces: string[]; ids: string[] };
+function heldLayer(svg: SVGSVGElement): HeldLayer {
+  const animated = [...svg.querySelectorAll<SVGElement>('.arrow-reveal, path.arrow, .arrow-label, .arrow-year')];
+  const styles = animated.map(e => e.getAttribute('style'));
+  for (const e of animated) {
+    const css = getComputedStyle(e);
+    e.style.opacity = css.opacity;
+    if (e.classList.contains('arrow-reveal')) e.style.strokeDashoffset = css.strokeDashoffset;
   }
+  const children = [...svg.children];
+  const layer = {
+    classes: svg.getAttribute('class') ?? '', opacity: Number(getComputedStyle(svg).opacity),
+    defs: children.filter(e => e.tagName === 'defs').map(e => e.outerHTML).join(''),
+    pieces: pieces(svg), ids: [...svg.querySelectorAll('[id]')].map(e => e.id)
+  };
+  animated.forEach((e, i) => styles[i] === null ? e.removeAttribute('style') : e.setAttribute('style', styles[i]!));
+  return layer;
+}
+// A layer's drawings, each as its markup (not its <defs>)
+function pieces(svg: SVGSVGElement) { return [...svg.children].filter(e => e.tagName !== 'defs').map(e => e.outerHTML); }
+
+// Markup with every id (and every url(#id) or #id pointing at one) renamed, so the copy keeps its own patterns, filters
+// and masks beside the new drawings'
+function renamed(html: string, ids: string[]) {
+  for (const id of ids) html = html.replace(new RegExp(`(id="|#)${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=["')&])`, 'g'), `$1${id}-held`);
   return html;
 }
 
