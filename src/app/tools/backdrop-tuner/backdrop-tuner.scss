@@ -1,6 +1,0 @@
-@use '../../../styles/studio' as studio;
-
-// The randomize-studio panel look (styles/_studio.scss), top left: the time scale has the right side
-@include studio.buttons;
-.nsc-backdrop-tuner { top: 16px; left: 16px; @include studio.panel; }
-.show-button { top: 16px; left: 16px; @include studio.show-tab; }

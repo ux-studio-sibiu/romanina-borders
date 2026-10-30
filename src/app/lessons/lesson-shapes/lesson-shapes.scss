@@ -1,6 +1,0 @@
-// The preview: full bleed, breaking out of the lesson's column to the window's width and height (the page clips the
-// overflow, styles.scss); the map, timeline and caption inside fill it (charts/moments-map)
-.preview {
-  position: relative; width: 100vw; height: max(100dvh, 560px); margin: 24px 0 32px calc(50% - 50vw);
-  border-block: 2px solid var(--ink);
-}
