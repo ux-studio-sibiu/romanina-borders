@@ -18,7 +18,7 @@ export type BaseGeography = {
   rivers: Feature<MultiLineString, RiverProperties>[];
 };
 
-// Loads the map's geography once, for the whole app (providedIn: 'root' ≈ a module-level singleton). Lesson 08: one file
+// Loads the map's geography once, for the whole app (providedIn: 'root' ≈ a module-level singleton). One file
 // for every moment, close up or zoomed out to Europe (npm run data:background): the wide extent, Romania's and Moldova's
 // counties, every other country one shape, simplified less inside the area than outside it.
 @Injectable({ providedIn: 'root' })

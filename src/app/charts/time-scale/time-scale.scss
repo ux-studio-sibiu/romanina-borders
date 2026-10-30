@@ -3,7 +3,7 @@
 :host { display: block; }
 
 // The line is the panel's own left edge (set by the parent): everything is placed from it. The dots sit on it, the years,
-// titles and ticks to its right, the ear and the triangle outside it, to its left. Clear at the top (the header's links,
+// titles to its right, the ear and the triangle outside it, to its left. Clear at the top (the header's links,
 // the ear) and the bottom.
 .nsc-time-scale {
   position: relative; height: 100%; padding: 104px 16px 56px 0; user-select: none;
@@ -24,7 +24,8 @@
     position: absolute; left: -7px; transform: translateY(-8px); display: flex; align-items: flex-start; gap: 10px; padding: 0;
     border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer;
 
-    .dot { flex: none; width: 12px; height: 12px; margin-top: 2px; border: 2px solid var(--ink); border-radius: 50%; background: var(--surface); }
+    // A thin white ring round each, so the half over the map shows against a dark picture
+    .dot { flex: none; width: 12px; height: 12px; margin-top: 2px; border: 2px solid var(--ink); border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9); }
     .text { display: flex; flex-direction: column; gap: 1px; }
     .year { width: max-content; line-height: 16px; @include paper.mono-label(0.8125rem, 0.04em); font-weight: 700; }
     .title { max-width: 200px; overflow: hidden; font-size: 0.8rem; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
@@ -36,32 +37,14 @@
     &.is-waiting .year { padding: 0 3px; border: 1px dashed var(--ink); }
   }
 
-  // A moment's own events: a short thin ink dash, its year and name in ink beside it, the years in a column of their own
-  // (the names in another), set in from the moments' own labels (62px from the line), so they read as inside the moment
-  .tick {
-    position: absolute; left: 62px; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; padding: 0;
-    border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
-    .mark { flex: none; width: 6px; height: 1px; background: var(--ink); }
-    .tick-year { width: 28px; @include paper.mono-label(0.625rem, 0.04em); font-weight: 700; }
-    .tick-name { font-size: 0.75rem; }
-    &:hover .tick-name { text-decoration: underline; }
-  }
-
-  // The small play, at the right of the chosen moment's row
-  .play {
-    position: absolute; right: 0; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
-    border: 1.5px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); cursor: pointer;
-    svg { width: 10px; height: 10px; fill: currentColor; }
-    &:hover { background: var(--tint); }
-    &.is-playing { background: var(--ink); color: var(--surface); }
-  }
-
-  // The slider: an ink triangle outside the line, pointing at it, resting wherever it is left; it glides to a moment
-  // chosen elsewhere, and follows the pointer, or play, straight. The box is bigger than the triangle drawn in it, so it
+  // The slider: an ink triangle outside the line, pointing at it, settling on the moment shown; it glides to a moment
+  // chosen elsewhere, and follows the pointer straight. The box is bigger than the triangle drawn in it, so it
   // is easy to grab.
   .handle {
     position: absolute; top: 0; left: -34px; z-index: 1; width: 24px; height: 26px; transform: translateY(-50%); touch-action: none;
     cursor: grab; transition: top 0.25s ease;
+    // A white glow round the triangle, on the map side, so it shows against a dark picture
+    filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1.5px #fff);
     &::after {
       content: ''; position: absolute; right: 4px; top: 4px; width: 14px; height: 18px;
       background: var(--ink); clip-path: polygon(0 0, 100% 50%, 0 100%);
@@ -70,6 +53,5 @@
   }
   &.is-dragging { cursor: grabbing; }
   &.is-dragging .handle { cursor: grabbing; transition: none; }
-  &.is-playing .handle { transition: none; }
   @media (prefers-reduced-motion: reduce) { .handle { transition: none; } }
 }

@@ -1,0 +1,4 @@
+// Both slides in one cell, bottom-aligned, while one pushes the other out (the motion: slide-swap.ts)
+:host { display: grid; align-items: end; }
+
+.slide { grid-area: 1 / 1; min-width: 0; }

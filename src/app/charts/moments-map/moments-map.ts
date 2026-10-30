@@ -1,87 +1,176 @@
-import { Component, computed, effect, inject, input, isDevMode, signal, viewChild } from '@angular/core';
-import { type MapArrow, type MapPlace, needsWide, RegionMap, type Territory } from '../region-map/region-map';
-import { MomentIcon } from '../moment-icon/moment-icon';
+import { Component, computed, effect, inject, isDevMode, signal, untracked, viewChild } from '@angular/core';
+import { arrowDrawnYear, arrowsAtYear, arrowSpan, type MapArrow, type MapPlace, needsWide, RegionMap } from '../region-map/region-map';
 import { TimeScale } from '../time-scale/time-scale';
+import { StepScrollbar } from '../step-scrollbar/step-scrollbar';
+import { SlideSwap } from '../slide-swap/slide-swap';
+import { MomentCaption } from '../moment-caption/moment-caption';
+import { PlaySlider } from '../play-slider/play-slider';
+import { PictureFade } from '../picture-fade/picture-fade';
+import { IntroCover } from '../intro-cover/intro-cover';
+import { mediaSignal, storedFlag } from '../signals';
+import { momentShapes } from './moment-shapes';
+import { STEPS, WheelSteps } from './moment-steps';
 import { Geography } from '../../data/geography';
-import { type Moment, MOMENTS, type ShapeStatus, yearsAgo } from '../../data/moments';
-import { EMPIRE_COLOURS, EU_COLOUR, missingIds, PROVINCE_COLOURS, ZONE_COLOURS } from '../../data/palette';
+import { type Moment, MOMENTS } from '../../data/moments';
+import { missingIds } from '../../data/palette';
 import { NAME_PLACES, NAME_TEXTS } from '../../data/name-places';
-import { NameEditor, type NamePlaces, type NameTexts } from '../../tools/name-editor/name-editor';
 import { Shapes } from '../../data/shapes';
 import { SPOTS } from '../../data/spots';
 
-// The scroll wheel's step: how far to scroll (px), the pause that ends a gesture, the least time between steps (ms)
-const WHEEL_THRESHOLD = 40, WHEEL_GAP = 200, WHEEL_STEP = 700;
+// The scrollbar down the far right edge, in px (as in moments-map.scss)
+const SCROLLBAR_WIDTH = 14;
+// The share of the arrows' play slider kept at its left for the overview, before their first year
+const ARROW_LEAD = 0.15;
 
-// What each status means, for the timeline's key
-const STATUS_TEXT: Record<ShapeStatus, string> = {
-  built: 'Built from counties',
-  adjust: 'Built: an edge to adjust',
-  trace: 'To trace by hand',
-  arrows: 'No border: arrows in the player'
-};
-
-// Lesson 05: the map at a moment of the story, full bleed, with the moments' buttons and the moment's caption floating
-// over its bottom left (lesson 07: on the map page, a time scale down its right instead of the buttons). Fills its parent
-// (which must be positioned and sized). Used by the map page and lesson 05. `details`: the shapes' working notes
-// (each moment's status, the key, the notes on what to trace or adjust), for lesson 05; without them (the map page) the
-// caption tells the moment's story instead, for children (lesson 03).
+// The map at a moment of the story, full bleed, with the moment's caption floating over its bottom left, a time scale
+// down its right and a scrollbar at the far right; the scroll wheel and the scrollbar step through the moments
+// (moment-steps.ts), and the caption slides out and in the way the story moves. A moment with peoples passing through
+// has a play slider at the bottom right that draws their arrows on. What the map draws for each moment:
+// moment-shapes.ts. Fills its parent (which must be positioned and sized).
 @Component({
   selector: 'app-moments-map',
-  imports: [RegionMap, MomentIcon, TimeScale, NameEditor],
+  imports: [RegionMap, TimeScale, StepScrollbar, SlideSwap, MomentCaption, PlaySlider, PictureFade, IntroCover],
   templateUrl: './moments-map.html',
   styleUrl: './moments-map.scss'
 })
 export class MomentsMap {
-  readonly details = input(true);
-  readonly scrollNav = input(false); // the scroll wheel steps through the moments (the map page, which doesn't scroll itself)
-  readonly scale = input(false); // lesson 07: the moments on a time scale too, in a panel of its own (an experiment, the map page)
-  readonly nameEditor = input(false); // lesson 08: a dev tool over the map, to move and write the names (the map page, in development)
-
   protected readonly geography = inject(Geography);
-  protected readonly shapes = inject(Shapes);
-  // The timeline: every moment of the story, the shape it shows and how far that shape has got
+  private readonly shapes = inject(Shapes);
+  // The timeline: every moment of the story and the shape it shows
   protected readonly timeline = MOMENTS;
-  protected readonly yearsAgo = yearsAgo;
-  protected readonly statusText = STATUS_TEXT;
-  protected readonly statuses = Object.keys(STATUS_TEXT) as ShapeStatus[];
-  protected readonly momentId = signal('great-union');
-  // Lesson 07: the year under the time scale's triangle, while it is dragged, played or left between two moments
-  protected readonly scaleYear = signal<number | null>(null);
+  // The steps the scroll wheel and the scrollbar go through: the moments, and within one with several migrations each
+  // migration on its own
+  protected readonly steps = STEPS;
+  protected readonly stepLabels = STEPS.map(s => s.label);
+  // The chosen moment: the intro on every load (a refresh starts the story again)
+  protected readonly momentId = signal(MOMENTS[0].id);
+  private readonly index = computed(() => MOMENTS.findIndex(m => m.id === this.momentId()));
+  // Which way the story last moved: 1 forward in time, -1 back (the caption slides out and in that way)
+  protected readonly direction = signal<1 | -1>(1);
   protected readonly moment = computed(() => MOMENTS.find(m => m.id === this.momentId())!);
   protected readonly regionMap = viewChild(RegionMap);
 
-  protected readonly state = computed(() => this.shapes.states().find(s => s.id === this.moment().state));
-  // The provinces to show: the state's blocks, with Transylvania's or Bukovina's halves joined where it has both
-  protected readonly blocks = computed(() => (this.state()?.properties.provinces ?? []).map(id => this.shapes.blocks().find(b => b.id === id)!).filter(Boolean));
-  protected readonly colour = (id: string) => PROVINCE_COLOURS[id] ?? ZONE_COLOURS[id];
-  // Lesson 06: the moment's arrows (the peoples passing through), with ids for the map's loops
-  protected readonly arrows = computed<MapArrow[]>(() => (this.moment().arrows ?? []).map(a => ({ id: `${this.moment().id}-${a.name}`, ...a })));
-  // The lands taken at this moment, with who took them
-  protected readonly lost = computed(() => (this.moment().lost ?? []).map(l => ({ ...l, shape: this.shapes.blocks().find(b => b.id === l.block)! })).filter(l => l.shape));
-  // The moment's soft zone, if it has one (the Dacians), and the zones of its neighbours
-  protected readonly zone = computed(() => this.shapes.zones().find(z => z.id === this.moment().zone));
-  protected readonly neighbours = computed(() => (this.moment().neighbours ?? []).map(id => this.shapes.zones().find(z => z.id === id)!).filter(Boolean));
-
-  // Lesson 06: the moment's own view
+  // What the map draws for the moment (moment-shapes.ts), and the parts of it the template needs on their own
+  private readonly drawn = computed(() => momentShapes(this.moment(), {
+    states: this.shapes.states(), blocks: this.shapes.blocks(), lands: this.shapes.lands(), empires: this.shapes.empires(), zones: this.shapes.zones()
+  }, this.geography.base()?.land.features ?? []));
+  protected readonly territories = computed(() => this.drawn().territories);
+  protected readonly state = computed(() => this.drawn().state);
+  protected readonly zone = computed(() => this.drawn().zone);
+  protected readonly neighbours = computed(() => this.drawn().neighbours);
+  protected readonly countries = computed(() => this.drawn().countries);
+  // The moment's own view, its places and its curiosities (data/spots.ts)
   protected readonly view = computed(() => this.moment().view ?? null);
   protected readonly places = computed<MapPlace[]>(() => (this.moment().places ?? []).map(p => ({ id: `${this.moment().id}-${p.name}`, ...p })));
-  // Lesson 08: the moment's curiosities, by id (data/spots.ts)
   protected readonly spots = computed(() => (this.moment().spots ?? []).map(id => SPOTS[id]).filter(Boolean));
-  // Lesson 06: the moment's whole countries (the EU's members), from the map's own countries: filled and named
-  protected readonly countries = computed<Territory[]>(() => {
-    const land = this.geography.base()?.land.features ?? [];
-    return (this.moment().countries ?? []).flatMap(c => {
-      const parts = land.filter(f => c.codes.includes(f.properties.country));
-      if (!parts.length) return [];
-      const geometry = { type: 'FeatureCollection' as const, features: parts };
-      return [{ kind: 'province' as const, id: `${this.moment().id}-${c.codes[0]}`, geometry, colour: EU_COLOUR, label: c.name }];
-    });
+  // The names placed and written by hand (data/name-places.ts)
+  protected readonly namePlaces = NAME_PLACES;
+  protected readonly nameTexts = NAME_TEXTS;
+
+  // The moment's arrows (the peoples passing through), with ids for the map's loops
+  protected readonly arrows = computed<MapArrow[]>(() => (this.moment().arrows ?? []).map(a => ({ id: `${this.moment().id}-${a.name}`, ...a })));
+  // Their play slider: the years they play over (null: no dated arrows, no slider), with a stretch before them at its
+  // left (ARROW_LEAD of the track) where it rests at first, every arrow drawn in full: the year it is at, whether it
+  // plays, a mark for each people where its arrow is fully drawn, and above it the people named at that year (as the
+  // map's caption names it). A click on a mark goes to its year and shows that migration on its own (arrowOnly, by
+  // arrow index) until the slider moves again.
+  protected readonly arrowYears = computed(() => arrowSpan(this.arrows()));
+  protected readonly arrowStart = computed(() => { const s = this.arrowYears(); return s ? s[0] - (s[1] - s[0]) * ARROW_LEAD / (1 - ARROW_LEAD) : 0; });
+  // Before the first year, in the stretch at the left: the overview, every arrow in full
+  protected readonly arrowOverview = computed(() => !!this.arrowYears() && this.arrowYear() < this.arrowYears()![0]);
+  protected readonly arrowYear = signal(0);
+  protected readonly arrowsPlaying = signal(false);
+  protected readonly arrowOnly = signal<number | null>(null);
+  private readonly dated = computed(() => this.arrows().map((a, i) => ({ a, i })).filter(({ a }) => a.years));
+  protected readonly arrowMarks = computed(() => this.dated().map(({ a }) => ({ at: arrowDrawnYear(a), name: a.name })));
+  protected readonly activeMark = computed(() => { const only = this.arrowOnly(); return only === null ? null : this.dated().findIndex(d => d.i === only); });
+  // The migration named at the slider's year, by arrow index (-1: none; none in the overview either)
+  private readonly arrowNamed = computed(() => this.arrowOverview() ? -1 : arrowsAtYear(this.arrows(), this.arrowYear(), this.arrowOnly()).caption);
+  protected readonly arrowTitle = computed(() => {
+    // The overview names the span of them all
+    if (this.arrowOverview()) {
+      const years = this.arrows().flatMap(a => a.years ?? []);
+      return `${Math.min(...years)}–${Math.max(...years)}: all the peoples`;
+    }
+    const a = this.arrows()[this.arrowNamed()];
+    return a ? (a.when ? `${a.when}: ` : '') + a.name : '';
   });
-  protected readonly euColour = EU_COLOUR;
-  protected readonly empires = computed(() => (this.moment().empires ?? []).map(id => this.shapes.empires().find(e => e.id === id)!).filter(Boolean));
+  // Its picture, at the map's top left, fading from one migration's to the next (none in the overview)
+  protected readonly arrowPicture = computed(() => this.moment().arrows?.[this.arrowNamed()]?.picture ?? null);
+  // The slider moved (dragged, played or a mark picked): the migration shown on its own goes back among the others; a
+  // mark picked sets it again just after (pickArrow)
+  protected setArrowYear(year: number) { this.arrowYear.set(year); this.arrowOnly.set(null); }
+  protected pickArrow(mark: number) { this.arrowOnly.set(this.dated()[mark]?.i ?? null); }
+  // One migration on its own, fully drawn, the slider paused at it (as a click on its mark)
+  private isolate(arrow: number) {
+    this.arrowsPlaying.set(false);
+    this.arrowYear.set(arrowDrawnYear(this.arrows()[arrow]));
+    this.arrowOnly.set(arrow);
+  }
+
+  // The step shown: the moment's own, or, in a moment with migration steps, the migration on its own, else the one named
+  // at the slider's year, else (the overview) the first
+  protected readonly stepIndex = computed(() => {
+    const id = this.momentId(), first = STEPS.findIndex(s => s.moment.id === id);
+    if (STEPS[first]?.arrow === null) return first;
+    const named = this.arrowOnly() ?? (this.arrowNamed() >= 0 ? this.arrowNamed() : null);
+    const at = STEPS.findIndex(s => s.moment.id === id && s.arrow === named);
+    return at >= 0 ? at : first;
+  });
+  // One step later (1) or earlier (-1), for the wheel and the scrollbar: from a moment's overview, later is its first
+  // migration (the overview shows on the scrollbar at that step, so the step after it would skip one)
+  private stepBy(way: 1 | -1) {
+    const inOverview = this.arrowOverview() && STEPS[this.stepIndex()]?.arrow !== null;
+    this.goToStep(this.stepIndex() + (way > 0 ? (inOverview ? 0 : 1) : -1));
+  }
+  // The scrollbar picked a step: the next or the one before, as the wheel steps; any other (dragged to), that one
+  protected fromScrollbar(i: number) {
+    const d = i - this.stepIndex();
+    if (d === 1 || d === -1) this.stepBy(d);
+    else this.goToStep(i);
+  }
+  // To a step: its moment (its migration shown on its own once the moment is in), or, within the moment, the migration
+  protected goToStep(i: number, fade = true) {
+    const step = STEPS[i];
+    if (!step) return;
+    if (step.moment.id !== this.momentId()) this.choose(step.moment, fade, step.arrow);
+    else if (step.arrow !== null) this.isolate(step.arrow);
+  }
+  // The scroll wheel: a step per gesture (moment-steps.ts); ctrl + wheel is the browser's zoom
+  private readonly wheel = new WheelSteps();
+  protected scroll(event: WheelEvent) {
+    if (event.ctrlKey) return;
+    event.preventDefault();
+    const way = this.wheel.step(event);
+    if (way) this.stepBy(way);
+  }
+
+  // The time scale open (or folded to the years), the caption open (or folded to its title), the moments' people shown,
+  // each kept across reloads
+  protected readonly scaleOpen = storedFlag('romanianBorders.timeScaleOpen');
+  protected readonly captionOpen = storedFlag('romanianBorders.captionOpen');
+  protected readonly charactersShown = storedFlag('romanianBorders.charactersShown');
+  // How much of the map's right edge the scrollbar and the time scale cover (their widths and breakpoint:
+  // moments-map.scss), kept clear of the spots' cards and the intro's cover
+  private readonly scaleShown = mediaSignal('(width >= 760px)');
+  protected readonly coveredRight = computed(() => SCROLLBAR_WIDTH + (this.scaleShown() ? (this.scaleOpen() ? 300 : 100) : 0));
 
   constructor() {
+    // Arriving at a moment with dated arrows, they wait in the overview, all drawn in full, paused: play starts them from
+    // the first year. Arriving on a migration's step (the wheel or the scrollbar), that migration on its own instead.
+    effect(() => {
+      const span = this.arrowYears();
+      untracked(() => {
+        const arrow = this.arrivingArrow;
+        this.arrivingArrow = null;
+        this.arrowsPlaying.set(false);
+        this.arrowOnly.set(null);
+        if (!span) return;
+        if (arrow !== null && this.arrows()[arrow]) this.isolate(arrow);
+        else this.arrowYear.set(this.arrowStart());
+      });
+    });
+
     // In development, every id the moments and the colours use must be in shapes.topo.json (data/palette.ts): a typo would
     // quietly show nothing. Checked once the file has loaded.
     if (isDevMode()) effect(() => {
@@ -91,122 +180,23 @@ export class MomentsMap {
     });
   }
 
-  // Lesson 06: a moment with another view zooms; the map keeps a copy of the old drawings first, to fade them out. With
-  // the same view (lesson 08), only when stepped to with the scroll wheel (`fade`): what changed fades out, then in;
-  // a click shows the new moment at once. A zoom out past the area over the satellite picture waits until the wide
-  // picture is ready: started earlier, its edges would show blank, then the picture pop in, mid-zoom.
+  // A moment with another view zooms; the map keeps a copy of the old drawings first, to fade them out. With the same
+  // view, only when stepped to with the scroll wheel (`fade`): what changed fades out, then in; a click shows the new
+  // moment at once. A zoom out past the area over the satellite picture waits until the wide picture is ready: started
+  // earlier, its edges would show blank, then the picture pop in, mid-zoom.
+  // `arrow`: a migration to show on its own once the moment is in (a migration's step), by arrow index
   private chosen = 0;
-  protected async choose(moment: Moment, fade = false) {
+  private arrivingArrow: number | null = null;
+  protected async choose(moment: Moment, fade = false, arrow: number | null = null) {
     const ticket = ++this.chosen;
+    this.arrivingArrow = arrow;
     if (needsWide(moment.view) && !moment.plain) {
       await this.regionMap()?.widePicture();
       if (ticket !== this.chosen) return; // another moment was chosen meanwhile
     }
     const zooms = JSON.stringify(moment.view ?? null) !== JSON.stringify(this.view());
     if (moment.id !== this.momentId() && (zooms || fade)) this.regionMap()?.holdDrawings();
+    if (moment.id !== this.momentId()) this.direction.set(MOMENTS.indexOf(moment) > this.index() ? 1 : -1);
     this.momentId.set(moment.id);
   }
-
-  // The scroll wheel: one moment per gesture, down for later, up for earlier. A trackpad sends a stream of small events
-  // and keeps sending them as it coasts, so the deltas add up to a threshold, a step is taken once per gesture (a gap of
-  // WHEEL_GAP ms with no events ends one), and never sooner than WHEEL_STEP ms after the last.
-  private wheel = { sum: 0, last: 0, stepped: 0, used: false };
-  protected scroll(event: WheelEvent) {
-    if (!this.scrollNav() || event.ctrlKey) return; // ctrl + wheel is the browser's zoom
-    event.preventDefault();
-    const now = performance.now(), w = this.wheel;
-    if (now - w.last > WHEEL_GAP) { w.sum = 0; w.used = false; }
-    w.last = now;
-    if (w.used || now - w.stepped < WHEEL_STEP) return;
-    w.sum += event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * 40;
-    if (Math.abs(w.sum) < WHEEL_THRESHOLD) return;
-    const i = MOMENTS.findIndex(m => m.id === this.momentId()) + Math.sign(w.sum);
-    w.used = true; w.stepped = now; w.sum = 0;
-    if (i >= 0 && i < MOMENTS.length) this.choose(MOMENTS[i], true);
-  }
-
-  // Lesson 07: whether the time scale is open (or folded to the years), kept across reloads
-  protected readonly scaleOpen = signal(readScaleOpen());
-  // Lesson 08: how much of the map's right edge the time scale covers (its widths and breakpoint: moments-map.scss), kept
-  // clear of the spots' cards
-  private readonly scaleShown = mediaSignal('(width >= 760px)');
-  protected readonly coveredRight = computed(() => this.scale() && this.scaleShown() ? (this.scaleOpen() ? 300 : 150) : 0);
-  protected setScaleOpen(open: boolean) {
-    this.scaleOpen.set(open);
-    try { localStorage.setItem(SCALE_OPEN_KEY, String(open)); } catch { /* not kept: fine */ }
-  }
-
-  // The names placed and written by hand (data/name-places.ts), and over them the name editor's (a dev tool), kept in
-  // localStorage until they are copied into the data. Only the edits that differ from the data are kept, so once copied
-  // in they go, and a later change to the data shows rather than staying hidden under an old edit.
-  private readonly editedPlaces = signal<NamePlaces>(readEdits(NAMES_KEY, NAME_PLACES));
-  private readonly editedTexts = signal<NameTexts>(readEdits(TEXTS_KEY, NAME_TEXTS));
-  protected readonly namePlaces = computed(() => ({ ...NAME_PLACES, ...this.editedPlaces() }));
-  protected readonly nameTexts = computed(() => ({ ...NAME_TEXTS, ...this.editedTexts() }));
-  protected setPlaces(places: NamePlaces) { this.editedPlaces.set(save(NAMES_KEY, unlike(places, NAME_PLACES))); }
-  protected setTexts(texts: NameTexts) { this.editedTexts.set(save(TEXTS_KEY, unlike(texts, NAME_TEXTS))); }
-  protected resetNames() { this.setPlaces({}); this.setTexts({}); }
-
-  // On intent (the pointer over, or the keyboard on, a zoomed-out moment's button): fetch the wide picture now, so the
-  // zoom out finds it ready (the map fetches it anyway, soon after its own, unless the browser asks to save data)
-  protected prepare(moment: Moment) {
-    if (needsWide(moment.view) && !moment.plain) this.regionMap()?.widePicture();
-  }
-
-  // The empires round it, the state's provinces, filled, then its outline over everything: one, or one per country when it has several (c. 1400)
-  protected readonly territories = computed<Territory[]>(() => {
-    const state = this.state();
-    // With whole countries (zoomed out to Europe), them and the state's outline: its provinces would be too small to read
-    if (this.countries().length) return [...this.countries(), ...(state ? [{ kind: 'outline' as const, id: `${state.id}-outline`, geometry: state }] : [])];
-    // The empires first, under everything else
-    const empires = this.empires().map(e => ({ kind: 'empire' as const, id: e.id, geometry: e, colour: EMPIRE_COLOURS[e.id], label: e.properties.name, at: e.properties.at }));
-    // A soft zone: the moment's land itself (the Dacians), or, under a state, unnamed, for comparison (as strong as on its
-    // own moment, so it reads as the same kingdom)
-    const zone = this.zone();
-    const zones = zone ? [{ kind: 'zone' as const, id: zone.id, geometry: zone, colour: this.colour(zone.id), label: state ? undefined : zone.properties.name }] : [];
-    const neighbours = this.neighbours().map(z => ({ kind: 'zone' as const, id: z.id, geometry: z, colour: this.colour(z.id), light: true, label: z.properties.name }));
-    if (!state) return [...empires, ...neighbours, ...zones];
-    // The lands taken: dotted, over the veil, named, with who took them
-    const lost = this.lost().map(l => ({ kind: 'lost' as const, id: `lost-${l.block}`, geometry: l.shape, label: l.shape.properties.name, note: l.to }));
-    return [
-      ...empires,
-      ...zones,
-      ...lost,
-      ...this.blocks().map(b => ({ kind: 'province' as const, id: b.id, geometry: b, colour: this.colour(b.id), label: b.properties.name })),
-      ...(state.properties.lands
-        ? this.shapes.lands().filter(l => state.properties.lands!.includes(l.id)).map(l => ({ kind: 'outline' as const, id: `${l.id}-outline`, geometry: l }))
-        : [{ kind: 'outline' as const, id: `${state.id}-outline`, geometry: state }])
-    ];
-  });
-}
-
-// The name editor's places and words, kept across reloads (a dev tool): read without those the data has caught up with
-const NAMES_KEY = 'romanianBorders.namePlaces', TEXTS_KEY = 'romanianBorders.nameTexts';
-function readEdits<T>(key: string, data: Record<string, T>): Record<string, T> {
-  let stored: Record<string, T> = {};
-  try { stored = JSON.parse(localStorage.getItem(key) ?? '{}'); } catch { /* none kept */ }
-  return save(key, unlike(stored, data));
-}
-function save<T extends object>(key: string, value: T) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not kept: fine */ }
-  return value;
-}
-// The edits that differ from the data: a place to two decimals (about a kilometre, as the editor copies it), a text exactly
-function unlike<T>(edits: Record<string, T>, data: Record<string, T>): Record<string, T> {
-  const same = (a: unknown, b: unknown) => JSON.stringify(rounded(a)) === JSON.stringify(rounded(b));
-  return Object.fromEntries(Object.entries(edits).filter(([id, value]) => !same(value, data[id])));
-}
-function rounded(value: unknown) { return Array.isArray(value) ? value.map(v => Math.round(v * 100) / 100) : value; }
-
-// Whether a media query matches, as a signal kept up to date
-function mediaSignal(query: string) {
-  const media = matchMedia(query), matches = signal(media.matches);
-  media.addEventListener('change', e => matches.set(e.matches));
-  return matches.asReadonly();
-}
-
-// Lesson 07: the time scale open or folded, open at first
-const SCALE_OPEN_KEY = 'romanianBorders.timeScaleOpen';
-function readScaleOpen() {
-  try { return localStorage.getItem(SCALE_OPEN_KEY) !== 'false'; } catch { return true; }
 }

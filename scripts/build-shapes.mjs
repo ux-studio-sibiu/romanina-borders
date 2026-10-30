@@ -1,4 +1,4 @@
-// Lesson 05: builds the map shapes that today's units (lesson 01) can make, from Roman Dacia to today.
+// Builds the map shapes that today's units can make, from Roman Dacia to today.
 //   npm run data:shapes
 //
 // scripts/data/geography.topo.json (and geography-wide, for the empires past the area) → public/data/shapes.topo.json,
@@ -152,13 +152,13 @@ const EMPIRES = [
 // cutting) and shown with a blurred edge, never a line (region-map). Burebista's kingdom, c. 60 BC: from the middle
 // Danube by Slovakia and the Hungarian plain, along the Danube and the Balkan range, to the Black Sea coast from Apollonia
 // to Olbia on the Bug, and north to the edge of Galicia. It stands for the Getae and Dacians before him too. Then its
-// neighbours, for a moment that zooms out to show them (lesson 06): rough, the way a children's atlas draws them. A zone
+// neighbours, for a moment that zooms out to show them: rough, the way a children's atlas draws them. A zone
 // is one ring (`points`) or several (`parts`: the Roman Republic, on both sides of the Adriatic).
 const ZONES = [
   {
     // From the middle Danube (where he beat the Boii) to the Dniester's mouth at Tyras, the Carpathians' northern edge
     // to the crest of the Balkan range, with the Greek cities of the coast from Tyras to Apollonia (Olbia he sacked, but
-    // didn't hold). All the zones adjusted by hand in a zone editor (lesson 07).
+    // didn't hold). All the zones adjusted by hand.
     id: 'burebista', name: 'Kingdom of Burebista', nameRo: 'Regatul lui Burebista', points: [
       [18.9, 48.0], [18.8, 47.3], [19.3, 46.0], [20.6, 44.8], [22.6, 43.4], [24.0, 42.9], [25.5, 42.75], [27.12, 43.01],
       [27.95, 42.2], [28.77, 43.62], [30.16, 44.79], [30.8, 46.25], [29.96, 47.12], [29.71, 48.07], [27.63, 48.55], [25.47, 48.52],
@@ -379,7 +379,7 @@ console.log(`Wrote ${file} (${(JSON.stringify(out).length / 1024).toFixed(0)} KB
 function collection(features) { return { type: 'FeatureCollection', features }; }
 
 // d3-geo is spherical: a polygon's ring direction says which side is inside. A shape bigger than a hemisphere was
-// wound the other way: turn every ring round (lesson 04 has the same check).
+// wound the other way: turn every ring round.
 function rightWayRound(geometry) {
   if (geoArea(geometry) <= 2 * Math.PI) return geometry;
   const turn = rings => rings.map(r => [...r].reverse());

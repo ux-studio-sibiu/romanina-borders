@@ -16,7 +16,7 @@ export type Empire = Feature<Polygon | MultiPolygon, EmpireProperties> & { id: s
 export type Zone = Feature<Polygon | MultiPolygon, ZoneProperties> & { id: string };
 type Objects = { blocks: GeometryCollection<BlockProperties>; states: GeometryCollection<StateProperties>; lands: GeometryCollection<LandProperties>; empires: GeometryCollection<EmpireProperties>; zones: GeometryCollection<ZoneProperties> };
 
-// Lesson 05: the map shapes built from today's units (scripts/build-shapes.mjs): the historical provinces (blocks) and
+// The map shapes built from today's units (scripts/build-shapes.mjs): the historical provinces (blocks) and
 // the lands at each moment (states), the countries of a moment that has several side by side (lands), and the empires
 // round them (empires), and the soft lands with no known border (zones), loaded once
 @Injectable({ providedIn: 'root' })

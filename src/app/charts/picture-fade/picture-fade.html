@@ -1,0 +1,9 @@
+<!-- The frame only while there is a picture; each picture its own element, so the old one fades out as the new fades in.
+     What is there from the start shows at once (it arrives with whatever brings it, a slide, say); only later changes fade. -->
+@if (picture(); as p) {
+  <div class="nsc-picture-fade" [animate.enter]="enterClass()" animate.leave="is-leaving">
+    @for (one of [p]; track one.src) {
+      <img class="picture" [src]="one.src" [alt]="one.alt" [animate.enter]="enterClass()" animate.leave="is-leaving" />
+    }
+  </div>
+}

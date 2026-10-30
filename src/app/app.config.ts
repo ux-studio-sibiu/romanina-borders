@@ -11,7 +11,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // Lesson 01: HttpClient (and httpResource) for the TopoJSON in public/data. withFetch() uses fetch() instead of XHR.
+    // HttpClient (and httpResource) for the TopoJSON in public/data. withFetch() uses fetch() instead of XHR.
     provideHttpClient(withFetch())
   ]
 };

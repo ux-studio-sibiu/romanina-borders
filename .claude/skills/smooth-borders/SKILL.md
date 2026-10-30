@@ -14,8 +14,8 @@ description: >-
 
 The derived shapes (provinces, states, lands, empires, soft zones) are built by `scripts/build-shapes.mjs` (`npm run data:shapes`) from
 today's units in `public/data/geography.topo.json`, into `public/data/shapes.topo.json`. All the smoothing happens in
-that script, at build time, never in the browser. The base map (lesson 01) is deliberately left detailed: its lines are
-snapping targets for the trace tool; only the picture-book shapes are simplified.
+that script, at build time, never in the browser. The base map is deliberately left detailed: the
+derived shapes are built from its lines; only the picture-book shapes are simplified.
 
 ## The rule that matters most: simplify the shared topology, never each shape alone
 
@@ -195,12 +195,12 @@ for (const f of feature(t, t.objects.states).features)
 
    Reference areas: 1918 ≈ 295,000 km² (got 296,701 with the lagoons), Bessarabia with the Budjak 44,422 km². An area
    near 510 million km² means a ring is wound the wrong way (step 4).
-3. Open `/lessons/shapes` (the lesson 05 preview) and step through the years, zoomed on the coast: no gaps between
+3. Open the map (`/`) and step through the moments, zoomed on the coast: no gaps between
    provinces, the outline crosses lagoon mouths in a straight line, one outline per state (three for c. 1400).
 
 ## Don't
 
 - Don't simplify blocks and states separately, or simplify after `quantize` with weights in degrees.
 - Don't edit `public/data/shapes.topo.json` by hand: it is regenerated; change the script.
-- Don't simplify `geography.topo.json` (the base map) for this: the trace tool snaps to its detail.
+- Don't simplify `geography.topo.json` (the base map) for this: the shapes are built from its detail.
 - Don't use a concave polygon for a cut: Sutherland–Hodgman needs a convex clip.

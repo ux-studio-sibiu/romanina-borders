@@ -1,67 +1,44 @@
 <div class="nsc-moments-map" (wheel)="scroll($event)">
-  <!-- The veil is left off when neighbours are shown: they are the point of the view -->
-  <app-region-map [geography]="geography.base()" [territories]="territories()" [focus]="neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
-                  [arrows]="arrows()" [nameAt]="namePlaces()" [nameText]="nameTexts()" [arrowYear]="scaleYear()" [places]="places()" [spots]="spots()" [coveredRight]="coveredRight()" [view]="view()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
-  @if (!moment().state && !moment().zone) {
-    @if (details()) { <p class="no-shape" [attr.data-status]="moment().status">{{ moment().status === 'trace' ? 'To trace' : 'Arrows, in the player' }}</p> }
+  <!-- The veil is left off when neighbours are shown (they are the point of the view), or when the moment asks -->
+  <app-region-map [geography]="geography.base()" [territories]="territories()" [focus]="moment().unveiled || neighbours().length || countries().length ? null : zone() ?? state() ?? null" [softFocus]="!!zone()"
+                  [arrows]="arrows()" [nameAt]="namePlaces" [nameText]="nameTexts" [arrowYear]="arrowYears() && !arrowOverview() ? arrowYear() : null" [arrowOnly]="arrowOnly()" [places]="places()" [spots]="spots()" [coveredRight]="coveredRight()" [view]="view()" [satellite]="!moment().plain" [plain]="!!moment().plain" label="The lands at the chosen moment" />
+
+  <!-- The opening slide: its cover over a darker veil, the whole map's size, fading in and out (not one of the moments'
+       panels, which slide). Before the time scale and the scrollbar, so they stay on top of it, still to be used; the
+       cover centred clear of them. -->
+  @if (moment().intro) {
+    <app-intro-cover [moment]="moment()" [style.padding-right.px]="coveredRight() + 24" animate.enter="is-entering" animate.leave="is-leaving" />
   }
 
-  <!-- Lesson 07: the moments down a time scale, at the right, with their titles (folds to the years) -->
-  <!-- A dev tool: the names on the map, to move and write -->
-  @if (nameEditor()) {
-    <app-name-editor [names]="regionMap()?.names() ?? []" [places]="namePlaces()" [texts]="nameTexts()" [projection]="regionMap()?.projection()"
-                     (placesChange)="setPlaces($event)" (textsChange)="setTexts($event)" (reset)="resetNames()" />
-  }
+  <!-- The moments down a time scale, at the right, with their titles (folds to the years) -->
+  <app-time-scale class="scale" [class.is-closed]="!scaleOpen()" [open]="scaleOpen()" (openChange)="scaleOpen.set($event)"
+                  [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" />
 
-  @if (scale()) {
-    <app-time-scale class="scale" [class.is-closed]="!scaleOpen()" [open]="scaleOpen()" (openChange)="setScaleOpen($event)"
-                    [moments]="timeline" [activeId]="momentId()" (picked)="choose($event)" (scrubbed)="scaleYear.set($event)" />
-  }
+  <!-- At the top left, while a migration is named on the play slider: its picture, fading to the next one's within the
+       moment, and under it, at its right, when and who; both pushed out with the details when the moment changes -->
+  <app-slide-swap class="people-picture" [item]="moment()" [direction]="direction()">
+    <ng-template>
+      <app-picture-fade [picture]="arrowPicture()" />
+      @if (arrowPicture()) { <p class="people-title">{{ arrowTitle() }}</p> }
+    </ng-template>
+  </app-slide-swap>
 
-  <!-- At the bottom left, one above the other: without the time scale (lesson 05), the moments' buttons; then the caption -->
-  <div class="side">
-  @if (!scale()) {
-  <!-- Every moment with its shape's status: a coloured bar under the year (see the key) -->
-  <div class="controls">
-    <ol class="timeline" aria-label="Moments">
-      @for (m of timeline; track m.id) {
-        <li>
-          <button type="button" [class.is-active]="m.id === momentId()" [attr.data-status]="details() ? m.status : null" [attr.aria-pressed]="m.id === momentId()" (click)="choose(m)" (pointerenter)="prepare(m)" (focus)="prepare(m)" [title]="details() ? m.title + ': ' + statusText[m.status] : m.title">{{ m.label }}</button>
-        </li>
-      }
-    </ol>
-    @if (details()) {
-      <ul class="key">
-        @for (s of statuses; track s) { <li><span class="bar" [attr.data-status]="s"></span>{{ statusText[s] }}</li> }
-      </ul>
+  <!-- At the far right: a scrollbar, one step per moment (and per migration within 271) -->
+  <app-step-scrollbar class="scrollbar" label="Moments" [count]="steps.length" [index]="stepIndex()" [labels]="stepLabels" (indexChange)="fromScrollbar($event)" />
+
+  <!-- Along the bottom, clear of the time scale: the moment's details at the left, sliding out and in the way the story
+       moves; at the right, for a moment with peoples passing through, the play slider for their arrows (above the
+       details when the row is too narrow for both) -->
+  <div class="bottom" [style.right.px]="coveredRight() + 16">
+    <app-slide-swap class="caption" [item]="moment()" [direction]="direction()" aria-live="polite">
+      <ng-template let-m>@if (!m.intro) {<app-moment-caption [moment]="m" [open]="captionOpen()" (openChange)="captionOpen.set($event)"
+                                              [showCharacters]="charactersShown()" (showCharactersChange)="charactersShown.set($event)" />}</ng-template>
+    </app-slide-swap>
+    @if (arrowYears(); as span) {
+      <app-play-slider class="player" label="Year" [start]="arrowStart()" [spread]="0.6" [min]="span[0]" [max]="span[1]" [value]="arrowYear()" (valueChange)="setArrowYear($event)" [(playing)]="arrowsPlaying"
+                       [marks]="arrowMarks()" [activeMark]="activeMark()" (markPicked)="pickArrow($event)">
+        <p class="player-title">{{ arrowTitle() || '…' }}</p>
+      </app-play-slider>
     }
   </div>
-  }
-
-  @let m = moment();
-  <div class="caption" aria-live="polite">
-    <!-- The moment's icon pops in beside its title (one element per moment, so it pops again for the next) -->
-    <div class="heading">
-      @for (one of [m]; track one.id) { <app-moment-icon [icon]="one.icon" /> }
-      <p class="state-name">{{ m.label }}: {{ m.title }} @if (details()) { <span class="status" [attr.data-status]="m.status">{{ statusText[m.status] }}</span> }</p>
-    </div>
-    @if (details()) {
-      @if (m.note) { <p class="note">{{ m.note }}</p> }
-    } @else {
-      <p class="ago">{{ yearsAgo(m.year) }}</p>
-      <p class="story">{{ m.text }}</p>
-    }
-    <!-- A key only for what the map doesn't name itself: the provinces, empires, peoples and lands taken all have their
-         names on the map. Left: Burebista's kingdom drawn unnamed under a later state, and the European
-         Union's blue, whose countries are named but not what joins them. -->
-    @let underZone = state() ? zone() : undefined;
-    @if (underZone || countries().length) {
-      <ul class="legend">
-        @if (underZone; as z) { <li><span class="swatch soft" [style.--zone]="colour(z.id)"></span>{{ z.properties.name }}, roughly (before the Romans)</li> }
-        @if (countries().length) { <li><span class="swatch" [style.background]="euColour"></span>The European Union today</li> }
-      </ul>
-    }
-  </div>
-  </div>
-
 </div>

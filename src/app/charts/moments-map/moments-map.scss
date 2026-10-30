@@ -1,69 +1,45 @@
-@use '../../../styles/paper' as paper;
-
-// Fills the parent: the map behind, the two panels floating over it
+// Fills the parent: the map behind, the panels floating over it
 :host { position: absolute; inset: 0; display: block; }
 
+$scrollbar: 14px; // as SCROLLBAR_WIDTH in moments-map.ts
+
 .nsc-moments-map {
-  position: relative; width: 100%; height: 100%;
+  position: relative; width: 100%; height: 100%; overflow: hidden;
 
   app-region-map { position: absolute; inset: 0; }
 }
 
-// The panels: paper, an ink edge, the hatched lift; above the map, out of its way at its edges. At the bottom left, one
-// above the other, the moments' buttons (lesson 05) and the caption; down the right, the time scale (lesson 07).
-.side { position: absolute; left: 16px; bottom: 16px; z-index: 1; display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: min(520px, calc(100% - 32px)); }
-.controls, .caption { padding: 10px 12px; @include paper.panel(6px); }
+// Above the map, out of its way at its edges. Along the bottom (its right edge set clear of the time scale, from the
+// template), the caption at the left (sliding off the screen and back as the moments change, so the map clips it) and
+// the play slider at the right; down the right, the time scale, and at the far right the scrollbar.
+// The bottom row wraps upwards (wrap-reverse): with no room for both, the slider goes on a line of its own above the
+// caption. Only the panels take the pointer; the map shows through the rest of the row.
+.bottom {
+  position: absolute; left: 16px; bottom: 16px; z-index: 2; display: flex; flex-wrap: wrap-reverse; align-items: flex-start;
+  justify-content: space-between; gap: 16px; pointer-events: none;
 
-// Lesson 07: the time scale, a strip down the whole right edge, top to bottom (narrower folded): paper with an ink edge on
-// its left (the line itself), no lift; its top kept clear for the header's links. Hidden on a narrow window, where the
-// caption takes the width.
-.scale { position: absolute; top: 0; bottom: 0; right: 0; z-index: 1; width: 300px; border-left: 2px solid var(--ink); background: var(--surface); }
-.scale.is-closed { width: 150px; } // the widest years (1775–1812) on one line, with room to spare
+  > * { pointer-events: auto; }
+}
+.caption { flex: 0 1 520px; min-width: 0; }
+.player { flex: 0 1 380px; min-width: 260px; }
+// The people named at the slider's year: the same plain sans, bold, as the title under the migration's picture
+.player-title { margin: 0; font-size: 1.1rem; font-weight: 700; line-height: 1.4; }
+
+.scrollbar { position: absolute; top: 0; bottom: 0; right: 0; z-index: 1; width: $scrollbar; }
+
+// The time scale, a strip down the right edge, left of the scrollbar, top to bottom (narrower folded): paper with an ink
+// edge on its left (the line itself), a white halo on the line's map side so it shows against a dark picture, no lift.
+// Hidden on a narrow window, where the caption takes the width and the scrollbar is left to step through the moments.
+.scale { position: absolute; top: 0; bottom: 0; right: $scrollbar; z-index: 1; width: 300px; border-left: 2px solid var(--ink); background: var(--surface); box-shadow: -3px 0 0 rgb(255 255 255 / 0.9); }
+.scale.is-closed { width: 100px; } // just the widest years (1775–1812, highlighted) on one line
 @media (width < 760px) { .scale { display: none; } }
 
-// A shape's status, one colour each: on the timeline's bars, the key, the moment's tag and the map's placeholder
-[data-status] { --status: var(--muted); }
-[data-status='built'] { --status: #2f7d32; }
-[data-status='adjust'] { --status: #e08a00; }
-[data-status='trace'] { --status: var(--accent); }
-[data-status='arrows'] { --status: #6b6862; }
-
-// The moments in order, wrapping onto more rows; each a year with its status as a bar along the bottom
-.timeline {
-  display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none;
-
-  button {
-    height: 30px; padding: 0 8px; border: 2px solid var(--ink); border-radius: 0;
-    background: var(--surface); color: var(--fg); cursor: pointer; font: inherit; @include paper.mono-label(0.625rem, 0.06em); font-weight: 700;
-  }
-  button[data-status] { border-bottom: 5px solid var(--status); } // the status bar, with the working notes only
-  button:hover { background: var(--tint); }
-  button.is-active { background: var(--ink); color: var(--surface); }
+// A migration's picture: top left, a third of the map's width (up to 640px); left out on a narrow window, where it
+// would cover the map
+.people-picture { position: absolute; top: 16px; left: 16px; z-index: 1; width: min(34%, 640px); pointer-events: none; }
+// Under the picture, at its right: when, then who, large, in a plain bold sans on a white halo, as the map's names
+.people-title {
+  margin: 14px 0 0; text-align: right; color: #1a1a1a; font-size: 1.9rem; font-weight: 700; line-height: 1.15;
+  -webkit-text-stroke: 6px #fff; paint-order: stroke fill;
 }
-
-.key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 0.8rem; color: var(--muted); }
-.key li { display: flex; align-items: center; gap: 6px; }
-.bar { width: 18px; height: 5px; background: var(--status); }
-
-// No shape yet: a tag in the middle of the map
-// Arrows, or a trace to come: the tag says so, in the working notes only
-.no-shape {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: 8px 14px;
-  border: 2px solid var(--status); background: var(--surface); color: var(--status);
-  @include paper.mono-label(0.75rem, 0.12em); font-weight: 700;
-}
-
-.heading { display: flex; align-items: center; gap: 10px; }
-.state-name { margin: 0; font-weight: 700; }
-.status { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--status); color: var(--status); @include paper.mono-label(0.625rem, 0.08em); font-weight: 700; vertical-align: 2px; }
-.note { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
-// The story, for children: the time in a child's terms, then the words, a size up
-.ago { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; font-style: italic; }
-.story { margin: 6px 0 0; font-size: 1.05rem; line-height: 1.5; }
-
-.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 0.9rem; }
-.legend li { display: flex; align-items: center; gap: 6px; }
-.swatch { width: 14px; height: 14px; border: 1px solid var(--ink); }
-// A soft zone: its colour fading out, as on the map
-.swatch.soft { border: none; background: radial-gradient(circle, var(--zone) 35%, transparent 75%); }
-
+@media (width < 760px) { .people-picture { display: none; } }

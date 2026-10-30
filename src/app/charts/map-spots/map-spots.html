@@ -3,6 +3,8 @@
     <button type="button" class="spot" [class.is-open]="open() === s.id" [style.left.px]="s.x" [style.top.px]="s.y"
             [attr.aria-expanded]="open() === s.id" [attr.aria-label]="s.title ? s.name + ': ' + s.title : s.name" (click)="toggle(s.id)">
       <span class="ring" aria-hidden="true"></span>
+      <!-- A spot still waiting for its pictures: a small red dot on its marker -->
+      @if (!s.pictures?.length) { <span class="no-pictures" aria-hidden="true"></span> }
       <span class="badge" aria-hidden="true">
         <svg viewBox="0 0 24 24">
           @switch (s.kind) {
@@ -14,6 +16,8 @@
             @case ('monastery') { <path d="M12 2v5M10 4h4M4 20h16M6 20v-8l6-5 6 5v8M10 20v-4h4v4" /> }
             <!-- Battlements and a gate -->
             @case ('fortress') { <path d="M2 20h20M4 20V7h3v2h3V7h4v2h3V7h3v13M10 20v-4a2 2 0 0 1 4 0v4" /> }
+            <!-- Two crossed swords, each a blade, a crossguard and a grip -->
+            @case ('battle') { <path d="M4 4l11 11M13 19l6-6M16 16l4 4M20 4L9 15M5 13l6 6M8 16l-4 4" /> }
           }
         </svg>
       </span>
@@ -22,13 +26,15 @@
 
   @if (card(); as c) {
     <aside class="spot-card" [class.is-wide]="c.wide" [style.left.px]="c.left" [style.width.px]="c.width" [attr.aria-label]="c.spot.title ?? c.spot.name">
-      <div class="body" [style.max-height.px]="c.maxHeight" [style.grid-template-columns]="c.wide ? c.pictures + 'px 1fr' : null">
+      <div class="body" [style.max-height.px]="c.maxHeight" [style.grid-template-columns]="c.wide ? c.pictures + 'px ' + c.words + 'px' : null">
         @let pictures = c.spot.pictures ?? [];
         @let p = pictures[shown()];
-        <!-- The picture: a box of one size for every picture (sized for the largest), each whole in its top left corner,
-             so nothing moves when another is shown. No pictures yet: the empty box where they will go. -->
+        <!-- The picture: a box of one size for every picture (sized for the largest), each whole in its top left corner at
+             the size map-spots.ts fits it to, so nothing moves when another is shown. No pictures yet: the empty box where
+             they will go. -->
         @if (p) {
-          <div class="frame" [style.height.px]="c.frameHeight"><img [src]="p.src" [alt]="p.alt" /></div>
+          @let size = c.fitted[shown()];
+          <div class="frame" [style.height.px]="c.frameHeight"><img [src]="p.src" [alt]="p.alt" [style.width.px]="size.w" [style.height.px]="size.h" /></div>
         } @else {
           <div class="frame is-empty" [style.height.px]="c.frameHeight" aria-hidden="true"></div>
         }
@@ -57,7 +63,7 @@
           </div>
         </div>
       </div>
-      <button type="button" class="close" aria-label="Close" (click)="open.set(null)">×</button>
+      <button type="button" class="close" aria-label="Close" (click)="open.set(null)"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1 L9 9 M9 1 L1 9" /></svg></button>
     </aside>
   }
 </div>

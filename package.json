@@ -12,7 +12,8 @@
     "data:wide": "node scripts/build-geography.mjs --wide && node scripts/build-satellite.mjs --wide",
     "data:shapes": "node scripts/build-shapes.mjs",
     "data:background": "node scripts/build-geography.mjs --background",
-    "data:favicon": "node scripts/build-favicon.mjs"
+    "data:favicon": "node scripts/build-favicon.mjs",
+    "picture": "node scripts/spot-picture.mjs"
   },
   "private": true,
   "packageManager": "npm@11.6.0",

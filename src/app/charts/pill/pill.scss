@@ -1,0 +1,8 @@
+:host { display: inline; }
+
+// A small rounded box in the line, in the monospace label face, a size down from the text round it; it keeps to the
+// line's height so the lines don't spread apart
+.nsc-pill {
+  padding: 0.08em 0.4em; border-radius: 4px; background: var(--pill); color: var(--pill-ink);
+  font-family: var(--ui-mono); font-size: 0.86em; white-space: nowrap; box-decoration-break: clone;
+}

@@ -7,7 +7,7 @@
   --water: #d6e8f6;
   position: relative; width: 100%; height: 100%; margin: 0;
 
-  // Lesson 08: the layers, one over the other: the background's canvases (picture, land, lines) and the moment's two
+  // The layers, one over the other: the background's canvases (picture, land, lines) and the moment's two
   // <svg>s (its fills under the lines, everything else over them)
   // The <svg>s bleed 10% past the window on every side (BLEED in region-map.ts; their viewBox is the window's own
   // coordinates, bleed included), and are moved about the window's corner, 1/12 of their own box in
@@ -16,29 +16,31 @@
   canvas, .fills, .held { pointer-events: none; }
   path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
 
-  // Lesson 02: the satellite picture, as the backdrop tuner (backdrop-style.ts) sets it; the land, the lines and their
-  // colours are drawn on the canvases (region-map.ts), from the same tuner
+  // The satellite picture, as backdrop-style.ts sets it; the land, the lines and their
+  // colours are drawn on the canvases (region-map.ts), from the same numbers
   .picture { opacity: var(--satellite-opacity); filter: var(--satellite-filter); }
 
-  // Lesson 05: territories. A translucent fill so the land shows through; an outline in ink unless it says otherwise.
+  // Territories. A translucent fill so the land shows through; an outline in ink unless it says otherwise.
   .territory { fill: var(--territory, var(--accent)); fill-opacity: 0.55; }
   // The state border: a bold continuous black line on a white backing, so it reads over any colour
   .territory-outline, .territory-outline-halo { stroke-linecap: round; stroke-linejoin: round; }
   .territory-outline { stroke: var(--territory, var(--ink)); stroke-width: 3.5; }
   .territory-outline-halo { stroke: #fff; stroke-width: 7.5; }
 
-  // Lesson 06: the plain, stylized map (the European Union; its water and land on the canvases)
+  // The plain, stylized map (the European Union; its water and land on the canvases)
   svg.is-plain {
     // The members in the flag's own blue, solid, with faint white dotted borders between them
     .territory { fill-opacity: 1; stroke: rgb(255 255 255 / 0.7); stroke-width: 1.4px; stroke-dasharray: 0.1 3.5; stroke-linecap: round; stroke-linejoin: round; }
+    // Their names' halo (plain-colours.ts)
+    .territory-label { stroke: var(--plain-halo, #fff); }
   }
 
   text { @include paper.mono-label(0.625rem, 0.1em); fill: var(--muted); }
 
-  // Lesson 05: the veil outside the focus, the paper's colour (the tuner sets how strong)
+  // The veil outside the focus, the paper's colour (backdrop-style.ts sets how strong)
   .outside { fill: rgb(246 244 239 / var(--outside-veil, 0.55)); }
 
-  // Lesson 05: an empire, a different layer from the countries: hatched (its pattern, set in the template), a thin dashed
+  // An empire, a different layer from the countries: hatched (its pattern, set in the template), a thin dashed
   // edge in its colour, and its name in spaced capitals
   .empire-outline, .empire-outline-halo { stroke-linejoin: round; }
   .empire-outline { stroke-width: 2; stroke-dasharray: 7 4; }
@@ -48,14 +50,14 @@
     dominant-baseline: middle; stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke; pointer-events: none;
   }
 
-  // Lesson 06: a new moment's map simply replaces the last one, nothing on it animated: a province two moments share keeps
+  // A new moment's map simply replaces the last one, nothing on it animated: a province two moments share keeps
   // its element (the loops track by id) and doesn't move at all.
 
-  // Lesson 06: a soft zone: its colour, strong in the middle, fading out over the blurred edge; no line, no hatch
+  // A soft zone: its colour, strong in the middle, fading out over the blurred edge; no line, no hatch
   .zone { fill: var(--territory, var(--accent)); fill-opacity: 0.5; }
   .zone.is-light { fill-opacity: 0.55; } // a neighbour, with the lighter fade
 
-  // Lesson 06: a land taken: a dotted ink edge on a white backing (round dots), its name in the storybook face and, under
+  // A land taken: a dotted ink edge on a white backing (round dots), its name in the storybook face and, under
   // it, who took it
   .lost-halo, .lost-edge { stroke-linecap: round; stroke-linejoin: round; }
   .lost-halo { stroke: rgb(255 255 255 / 0.85); stroke-width: 6; }
@@ -66,38 +68,29 @@
   }
   .lost-note { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; font-style: italic; letter-spacing: 0; }
 
-  // Lesson 06–08: zooming. Each <svg> is a layer of its own that the browser paints once and moves (will-change), all the
+  // Zooming. Each <svg> is a layer of its own that the browser paints once and moves (will-change), all the
   // time. Nothing about the layer may change as a zoom ends: dropping it made the browser repaint the drawings from
   // scratch, a blank or half-drawn frame. So the fades are Web Animations that leave nothing behind (region-map.ts), not
   // classes that come off.
   svg { will-change: transform, opacity; }
 
-  // Lesson 06: a place: an ink dot on a white ring, its name beside it in the storybook face
+  // A place: an ink dot on a white ring, its name beside it in the storybook face
   .place-dot { fill: var(--ink); stroke: #fff; stroke-width: 2; }
   .place-label {
     font-family: var(--story-font); font-size: 13px; text-transform: none; letter-spacing: 0.02em; dominant-baseline: middle;
     fill: var(--ink); stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke; pointer-events: none;
   }
 
-  // Lesson 06: arrows for movement: fat white shapes outlined in black, the people's name and when on a white halo
+  // Arrows for movement: fat white shapes outlined in black, the people's name on a white halo
   path.arrow { fill: #fff; fill-opacity: 0.92; stroke: #1a1a1a; stroke-width: 2.6px; stroke-linejoin: round; }
   // The mask that draws an arrow on: wider than the arrow's head, all of it showing unless animated
   .arrow-reveal { fill: none; stroke: #fff; stroke-width: 130px; stroke-dasharray: 1 2; stroke-dashoffset: 0; }
   .arrow-label {
     font-family: var(--story-font); font-size: 18px; text-transform: none; letter-spacing: 0.02em; text-anchor: middle;
     fill: #1a1a1a; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; paint-order: stroke; pointer-events: none;
-    // The dates go in the caption at the top (.arrow-year) while the arrows play; on the arrows only without motion
-    .when { display: none; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; font-style: italic; letter-spacing: 0; }
-    @media (prefers-reduced-motion: reduce) { .when { display: inline; } }
-  }
-  // Lesson 06: the caption at the top: when, then who, large, shown one at a time in step with the arrows
-  .arrow-year {
-    font-family: var(--story-font); font-size: 34px; text-transform: none; letter-spacing: 0.02em; text-anchor: middle;
-    fill: #1a1a1a; stroke: #fff; stroke-width: 6px; stroke-linejoin: round; paint-order: stroke; pointer-events: none; opacity: 0;
-    @media (prefers-reduced-motion: reduce) { display: none; }
   }
 
-  // Lesson 05: a province's name in the storybook face, in its own colour (darkened), on a white halo
+  // A province's name in the storybook face, in its own colour (darkened), on a white halo
   .territory-label {
     font-family: var(--story-font); letter-spacing: 0.02em; text-transform: none; text-anchor: middle;
     fill: var(--ink); stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; paint-order: stroke;

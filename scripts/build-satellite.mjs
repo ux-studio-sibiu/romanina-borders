@@ -1,4 +1,4 @@
-// Lesson 02: builds the satellite backdrop the map draws under its lines.
+// Builds the satellite backdrop the map draws under its lines.
 //   npm run data:satellite            (uses the cached download)
 //   npm run data:satellite -- --fresh (downloads again)
 //
@@ -22,7 +22,7 @@ const BASE_URL = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73751
 // The map's area and projection, from src/app/data/region.json, as the app reads them: so the picture lines up with
 // every line drawn over it
 const region = JSON.parse(await readFile(join(dirname(fileURLToPath(import.meta.url)), '../src/app/data/region.json'), 'utf8'));
-// --wide: the wide extent, a smaller picture (lesson 06's views), satellite-wide.webp
+// --wide: the wide extent, a smaller picture (the zoomed-out views), satellite-wide.webp
 const WIDE = process.argv.includes('--wide');
 const REGION = WIDE ? region.wideSatellite : region.area;
 const NAME = WIDE ? 'satellite-wide' : 'satellite';

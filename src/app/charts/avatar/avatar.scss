@@ -1,0 +1,19 @@
+:host { display: block; --avatar-size: 96px; }
+
+// The circle: an ink ring, a white one round it so it stands off the map, and a soft shadow under it; at most
+// --avatar-size wide, smaller when its box is narrower. The name on a white label overlapping its bottom edge a little, so
+// the two read as one.
+.nsc-avatar {
+  display: flex; flex-direction: column; align-items: center; width: 100%; margin: 0;
+
+  .picture {
+    display: block; width: min(100%, var(--avatar-size)); aspect-ratio: 1; object-fit: cover; border: 3px solid var(--ink); border-radius: 50%;
+    background: var(--tint); box-shadow: 0 0 0 4px #fff, 0 4px 14px rgb(0 0 0 / 0.35);
+  }
+
+  .label {
+    position: relative; max-width: 100%; margin-top: -10px; display: flex; flex-direction: column; align-items: center; padding: 3px 10px 4px;
+    border: 2px solid var(--ink); background: #fff; text-align: center;
+  }
+  .name { font-size: 0.95em; font-weight: 700; line-height: 1.2; } // em: the surrounding size, so a row can set it smaller
+}

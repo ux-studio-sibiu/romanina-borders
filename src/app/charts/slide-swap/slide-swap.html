@@ -1,0 +1,6 @@
+<!-- One slide per item: a new item makes a new slide, and the old one is pushed out before it goes (slide-swap.ts) -->
+@for (one of [item()]; track one) {
+  <div class="slide" (animate.enter)="enter($event)" (animate.leave)="leave($event)">
+    <ng-container *ngTemplateOutlet="template(); context: { $implicit: one }" />
+  </div>
+}

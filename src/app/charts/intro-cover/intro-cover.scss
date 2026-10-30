@@ -1,0 +1,40 @@
+// The whole layer: a darker veil over the map, the cover in its middle (the parent sets the right padding to keep it
+// clear of the time scale). It fades in and out as a whole: the parent adds .is-entering and .is-leaving (animate.enter
+// and animate.leave) when it shows or drops it.
+:host {
+  position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 24px;
+  background: rgb(8 12 18 / 0.4);
+}
+:host(.is-entering) { animation: intro-in 450ms ease-out both; }
+:host(.is-leaving) { animation: intro-out 380ms ease-in both; pointer-events: none; }
+@keyframes intro-in { from { opacity: 0; } }
+@keyframes intro-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :host(.is-entering), :host(.is-leaving) { animation: none; } }
+
+// The cover: everything centred, in white with a soft shadow. The title's words, then its last word on its own line,
+// much larger; its sentences under it, one a line; then, well below, the faces, all on one row.
+.nsc-intro-cover {
+  width: min(960px, 100%); text-align: center; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+
+  .title { display: flex; flex-direction: column; align-items: center; margin: 0; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
+  .lead { font-size: clamp(1.5rem, 3vw, 2.4rem); }
+  .key { margin-top: 0.06em; font-size: clamp(3.5rem, 11vw, 8.5rem); letter-spacing: -0.02em; }
+  .text { margin: 14px auto 0; font-size: 1.15rem; line-height: 1.6; }
+  .line { display: block; }
+  // The pills keep their dark ink, without the shadow
+  app-pill { text-shadow: none; }
+
+  // The faces all on one row, pictures only, the width shared out equally (--count, from the template), the circles
+  // smaller to fit on a narrow window
+  .characters {
+    display: grid; grid-template-columns: repeat(var(--count, 5), minmax(0, 1fr)); justify-items: center; gap: 20px;
+    max-width: calc(var(--count, 5) * 176px); margin: 78px auto 0; padding: 0; list-style: none;
+  }
+  .characters li { width: 100%; }
+}
+
+@media (width < 760px) {
+  :host { padding: 16px 8px; }
+  .nsc-intro-cover .text { font-size: 1rem; }
+  .nsc-intro-cover .characters { gap: 6px; margin-top: 40px; }
+}

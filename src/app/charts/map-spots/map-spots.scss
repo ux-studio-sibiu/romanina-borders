@@ -18,26 +18,31 @@
       svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     }
     .ring { position: absolute; inset: 0; border: 3px solid #ffd84a; border-radius: 50%; animation: pulse 2.2s ease-out infinite; }
+    // No pictures yet: a small red dot over the badge's top right
+    .no-pictures { position: absolute; top: 0; right: 0; z-index: 1; width: 9px; height: 9px; border: 1.5px solid #fff; border-radius: 50%; background: #e5262f; }
 
     &:hover .badge, &.is-open .badge { transform: scale(1.12); background: #ffd84a; }
     &.is-open .ring { animation: none; opacity: 0; }
     &:focus-visible { outline: none; .badge { outline: 3px solid var(--accent); outline-offset: 2px; } }
   }
 
-  // The card: in the middle of the map (map-spots.ts sizes it), its body scrolling if the window is short (the card itself
-  // can't: it would cut off the panel's hatched lift). The picture, and beside it the words, with the picture's credit
-  // and the small ones to switch at the column's foot (the columns from map-spots.ts). Padding and gap as PAD and GAP
-  // there. Nothing changes size when another picture is shown: the box is the largest's, each thumbnail's rim inside it.
+  // The card: in the middle of the map, sized from what it holds (map-spots.ts: the words' column from its text, the
+  // picture box from the pictures' sizes), its body scrolling if the window is short (the card itself can't: it would
+  // cut off the panel's hatched lift). The picture, and beside it the words, with the picture's credit and the small ones
+  // to switch at the column's foot. Padding and gap as PAD and GAP there. Nothing changes size when another picture is
+  // shown: the box is the largest's, each thumbnail's rim inside it.
+  // Over the moments map's panels too (its details panel and people, z-index 2), which share its stacking; the time
+  // scale is left clear (map-spots.ts: coveredRight)
   .spot-card {
-    position: absolute; top: 50%; translate: 0 -50%; z-index: 2; box-sizing: border-box; pointer-events: auto;
+    position: absolute; top: 50%; translate: 0 -50%; z-index: 3; box-sizing: border-box; pointer-events: auto;
     @include paper.panel(6px); animation: pop 0.18s ease-out;
 
     .body { box-sizing: border-box; display: grid; gap: 14px 22px; overflow-y: auto; padding: 18px; }
 
     // The picture box: one size for every picture (map-spots.ts), invisible; the picture whole in its top left corner, in
-    // its own shape, with its own ink edge
+    // its own shape and at the size map-spots.ts fits it to (so a small one is enlarged a little), with its own ink edge
     .frame { overflow: hidden; }
-    .frame img { display: block; box-sizing: border-box; max-width: 100%; max-height: 100%; border: 1.5px solid var(--ink); }
+    .frame img { display: block; box-sizing: border-box; max-width: 100%; border: 1.5px solid var(--ink); }
     // No pictures yet: the box they will fill, dashed and empty (and the small ones, square)
     .frame.is-empty { box-sizing: border-box; border: 1.5px dashed var(--muted); background: var(--tint); }
 
@@ -66,11 +71,13 @@
     }
     .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .text { margin: 12px 0 0; font-size: 1.15rem; line-height: 1.5; }
-    // Over the words' top right corner
+    // Over the words' top right corner: a cross centred in a small ink-edged box, like the caption's fold
     .close {
-      position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0 0 2px; border: 0; border-radius: 50%;
-      background: #fff; color: var(--ink); font-size: 1.5rem; line-height: 1; cursor: pointer;
-      &:hover { background: var(--tint); }
+      position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+      border: 2px solid var(--ink); border-radius: 0; background: var(--surface); color: var(--ink); cursor: pointer;
+
+      svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2; }
+      &:hover { background: var(--ink); color: var(--surface); }
     }
   }
 

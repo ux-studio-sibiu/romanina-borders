@@ -1,11 +1,11 @@
-// Lesson 01: builds the base geography the map draws and later borders are built from.
+// Builds the base geography the map draws and later borders are built from.
 //   npm run data:geography            (uses the cached downloads)
 //   npm run data:geography -- --fresh (downloads again)
 //
 // Natural Earth 1:10m (public domain): admin-1 units, rivers, the Black Sea → scripts/data/geography.topo.json
 //   npm run data:geography:wide       the wide data (--wide): the bigger extent `wide` in region.json, every country one
 //                                     shape, simplified more → scripts/data/geography-wide.topo.json
-//   npm run data:background           what the map draws (--background, lesson 08) → public/data/background.topo.json
+//   npm run data:background           what the map draws (--background) → public/data/background.topo.json
 // The first two only feed the shapes' build (build-shapes.mjs): they stay out of public/, so the site doesn't ship them.
 // Runs in Node, at build time, never in the browser. The output is committed, so the app never depends on a third-party server.
 // Modelled on data-viz's scripts/build-boundaries.mjs.
@@ -32,7 +32,7 @@ const FILES = {
 // so a full-screen map has land to its edges. Its edges are meridians and parallels, so in [lon, lat] it is exactly this
 // box. Anything touching it is kept, whole: a unit cut at the edge would be useless for merging later.
 // --wide: the wide extent, one shape per country (the shapes' build reads it: an empire past the area).
-// --background (lesson 08): what the map draws under every moment, one file for every view: the wide extent, Romania's
+// --background: what the map draws under every moment, one file for every view: the wide extent, Romania's
 // and Moldova's counties as units, every other country one shape, simplified for the view it is seen at (below).
 const WIDE = process.argv.includes('--wide'), BACKGROUND = process.argv.includes('--background');
 const region = JSON.parse(await readFile(new URL('../src/app/data/region.json', import.meta.url), 'utf8'));
@@ -121,7 +121,7 @@ if (!blackSea) throw new Error('Black Sea not found');
 const sea = [{ type: 'Feature', id: 'black-sea', properties: { name: 'Black Sea', nameRo: 'Marea Neagră' }, geometry: blackSea.geometry }];
 
 // --- 4. Geometry: GeoJSON → TopoJSON → merged → simplified ----------------------------------------
-// TopoJSON stores each shared border once, as an arc both neighbours reference: the snapping targets of the trace tool (step 7)
+// TopoJSON stores each shared border once, as an arc both neighbours reference:
 // and what lets later borders be merged from units (step 5) with no gaps or overlaps.
 const collection = features => ({ type: 'FeatureCollection', features });
 let topo = topology({ units: collection(units), neighbours: collection(others), rivers: collection(rivers), sea: collection(sea) });

@@ -1,5 +1,5 @@
 // Where a name sits on the map, by the id of what it names (a province, a soft zone, an empire, a land taken), in
-// [lon, lat]: placed by hand (with the name editor, lesson 07). A name not listed here sits at its land's centre (an
+// [lon, lat]: placed by hand. A name not listed here sits at its land's centre (an
 // empire: at its own at).
 export const NAME_PLACES: Record<string, [number, number]> = {
   'burebista': [25.86, 45],
@@ -18,7 +18,7 @@ export const NAME_PLACES: Record<string, [number, number]> = {
 };
 
 // A name written by hand, by the same ids: its words and where its lines break (\n), instead of the land's own name split
-// in two when long (lesson 08, with the name editor)
+// in two when long
 export const NAME_TEXTS: Record<string, string> = {
-  'roman-dacia': 'Roman\nDacia'
+  'roman-dacia': 'Dacia\nromană'
 };

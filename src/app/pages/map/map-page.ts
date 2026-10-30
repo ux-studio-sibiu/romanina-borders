@@ -1,14 +1,11 @@
-import { Component, isDevMode } from '@angular/core';
+import { Component } from '@angular/core';
 import { MomentsMap } from '../../charts/moments-map/moments-map';
-import { BackdropTuner } from '../../tools/backdrop-tuner/backdrop-tuner';
 
-// The product page: the map at a moment of the story, full screen, with the timeline over it (lesson 05)
+// The product page: the map at a moment of the story, full screen, with the time scale over it
 @Component({
   selector: 'app-map-page',
-  imports: [MomentsMap, BackdropTuner],
+  imports: [MomentsMap],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss'
 })
-export class MapPage {
-  protected readonly isDev = isDevMode();
-}
+export class MapPage {}

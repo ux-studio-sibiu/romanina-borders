@@ -1,13 +1,23 @@
 import { afterRenderEffect, Component, computed, DestroyRef, effect, ElementRef, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { geoConicConformal, geoGraticule, geoPath, type GeoContext, type GeoPath, type GeoPermissibleObjects } from 'd3-geo';
+import { geoPath, type GeoContext, type GeoPath, type GeoPermissibleObjects } from 'd3-geo';
 import type { Geometry, Polygon } from 'geojson';
 import type { BaseGeography } from '../../data/geography';
-import region from '../../data/region.json';
 import type { Spot } from '../../data/spots';
 import { MapSpots } from '../map-spots/map-spots';
-import { Backdrop, type BackdropStyle } from './backdrop-style';
+import { BACKDROP, BACKDROP_FILTER } from './backdrop-style';
+import { PLAIN_COLOURS } from './plain-colours';
+import { TILES, type ZoneFill, ZONE_FILLS } from '../../data/zone-fills';
+import { type Camera, core, type Extent, needsWide, outline, PAD, PICTURES, PLANE, regionProjection, type Scene } from './plane';
+import { arrowsAtYear, arrowShape, type MapArrow, smoothLine } from './arrows';
+import { clear, drawBase, drawLines, feathered, readTokens, type Transform } from './region-map-canvas';
+import { between, ease, type HeldLayer, heldLayer, pieces, relative, renamed } from './zoom';
 
-// Lesson 05–06: a territory drawn on the map, by kind:
+// The map's parts, apart from the component: its geometry (plane.ts), the arrows (arrows.ts), the background's
+// painting (region-map-canvas.ts) and the zoom between views (zoom.ts). Shared from here too, for the moments map.
+export { arrowDrawnYear, arrowsAtYear, arrowSpan, type MapArrow } from './arrows';
+export { type Extent, needsWide } from './plane';
+
+// A territory drawn on the map, by kind:
 //   province: a filled shape in its colour, named at its centre
 //   outline:  a state's border, over everything
 //   empire:   round the provinces: hatched, a dashed edge, its name in spaced capitals at `at` ([lon, lat])
@@ -22,119 +32,64 @@ export type Territory =
   | Shape & { kind: 'lost'; label: string; note: string }
   | Shape & { kind: 'zone'; colour?: string; label?: string; light?: boolean };
 
-// Lesson 06: an arrow across the map, for movement rather than borders (the peoples passing through): a smooth curve
-// through its waypoints, in [lon, lat], first to last; the name (and when) at the waypoint labelAt, the middle by default
-export type MapArrow = { id: string; name: string; when?: string; years?: [number, number]; points: [number, number][]; labelAt?: number };
-
-// Lesson 06: a place on the map, a dot and its name, in [lon, lat] (the Greek cities on the coast, c. 60 BC)
+// A place on the map, a dot and its name, in [lon, lat] (the Greek cities on the coast, c. 60 BC)
 export type MapPlace = { id: string; name: string; at: [number, number] };
 
-// Lesson 06: a box to fit instead of the core, in [lon, lat]: a moment's own view
-export type Extent = [[number, number], [number, number]];
-
-// Lesson 06: how long the zoom from one view to the next takes, in seconds
+// How long the zoom from one view to the next takes, in seconds
 const ZOOM_SECONDS = 0.85;
-// Lesson 08: and the moment's drawings round it, so only the background moves while it zooms: the old drawings fade out
+// And the moment's drawings round it, so only the background moves while it zooms: the old drawings fade out
 // over FADE_OUT, the camera starts ZOOM_DELAY in; once it has stopped, FADE_GAP later, the new drawings fade in over FADE_IN
 const FADE_OUT = 0.2, ZOOM_DELAY = 0.1, FADE_GAP = 0.1, FADE_IN = 0.15;
-// Lesson 08: between two moments with the same view, no zoom: the old drawings fade out, and STILL_GAP after that the new
+// Between two moments with the same view, no zoom: the old drawings fade out, and STILL_GAP after that the new
 // fade in
 const STILL_GAP = 0.05;
-// Lesson 08: the drawings' <svg>s reach past the window by this much on every side (a fraction of its size), so they
+// The drawings' <svg>s reach past the window by this much on every side (a fraction of its size), so they
 // still cover it while the camera finishes, a little out from where they are drawn
 const BLEED = 0.1;
-// Lesson 06: the arrows drawn on one after another, in the order given (by year), each fading again a while later, then
-// started over: each starts ARROW_STEP after the last, takes ARROW_GROW to draw, stays ARROW_LINGER, fades over
-// ARROW_FADE; ARROW_PAUSE of empty map before the first comes back
-const ARROW_STEP = 2.4, ARROW_GROW = 2, ARROW_LINGER = 3.4, ARROW_FADE = 1.4, ARROW_PAUSE = 1.2;
-// Lesson 07: the arrows by a year instead (the time scale's): each draws on over its years (at least DRAW_YEARS, so a
-// short one is still seen), stays LINGER_YEARS after them, then fades over FADE_YEARS to PAST, a trace of where it went
-const DRAW_YEARS = 60, LINGER_YEARS = 80, FADE_YEARS = 60, PAST = 0.2;
 
-// From data/region.json, shared with the build scripts. The core: from the Tisza plain to the Dniester's mouth, the
-// Balkan range to Galicia; every state of the story is inside it, and the map is fitted so it is always fully in view,
-// whatever the window's shape. The area: the core and about a fifth more on every side, the detailed satellite
-// picture's extent. The map runs full bleed: whatever the window shows beyond the core is still map.
-const CORE = region.core as Extent;
-const REGION = region.area as Extent;
-const PAD = 16; // the core's least distance from the window's edges
-
-// An extent as a polygon: two parallels and two meridians. In a conic projection it isn't a rectangle: the meridians are
-// straight and lean together towards the north, the parallels are arcs. precision(0.25): a vertex every quarter degree
-// along the parallels. d3 joins vertices with great-circle arcs, not parallels, so at the default 2.5° the top and
-// bottom edges would show kinks.
-const outline = (extent: Extent) => geoGraticule().extent(extent).precision(0.25).outline();
-const core = outline(CORE);
-// Exported: the satellite picture, the trace tool's alignments and its smoothing all work in the area's box
-export const frame = outline(REGION);
-
-// Whether a view reaches past the detailed area (it needs the wide satellite picture, and shows no county lines)
-export function needsWide(view: Extent | null | undefined) {
-  return !!view && (view[0][0] < REGION[0][0] || view[0][1] < REGION[0][1] || view[1][0] > REGION[1][0] || view[1][1] > REGION[1][1]);
-}
-// The map's projection, before it is fitted to a size. Exported: the trace tool smooths its shapes in it (lesson 04).
-export const regionProjection = () => geoConicConformal().parallels(region.projection.parallels as [number, number]).rotate(region.projection.rotate as [number, number]);
-
-// Lesson 08: the plane. The background (the satellite pictures, the land, every line) is drawn in one fixed projection,
-// the area 1000 units wide, once, for every moment. A view is only a camera over it: a scale k and an offset x, y (a
-// point at P on the plane is at k·P + (x, y) on screen). Every view's projection is this one scaled and moved, so the
-// camera from one view to the next is exact, and the zoom between them is the camera eased from one to the other.
-const PLANE = regionProjection().fitWidth(1000, frame);
-type Camera = { k: number; x: number; y: number };
-
-// Lesson 08: the two satellite pictures, each placed over its extent's box on the plane: the wide one (the Roman world)
-// under the detailed one (the area), whose edge is feathered over `inset` degrees, so the two meet without a seam
-const PICTURES = [
-  { src: 'data/satellite-wide.webp', extent: region.wideSatellite as Extent, inset: 1 },
-  { src: 'data/satellite.webp', extent: REGION, inset: 0.6 }
-].map(p => {
-  const [[x0, y0], [x1, y1]] = geoPath(PLANE).bounds(outline(p.extent));
-  return { ...p, box: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };
-});
-type Picture = typeof PICTURES[number];
-
-// Lesson 08: how the background looks: over the satellite picture, on paper, or the plain stylized map (blue water,
-// no rivers: the European Union). `units`: how strongly the county lines show (none on a view past the area).
-type Look = 'satellite' | 'paper' | 'plain';
-type Scene = { look: Look; units: number };
 
 // D3 does the math, Angular renders the DOM: d3-geo turns [lon, lat] lines into SVG path strings in computed(),
 // the template binds them. Unlike data-viz's flat map (a fixed 960 × 500 viewBox), this map fills the window,
-// so the projection is refitted to the measured size whenever it changes. Lesson 08: the background under it is drawn
+// so the projection is refitted to the measured size whenever it changes. The background under it is drawn
 // on canvases, from the plane, by a camera (above).
 @Component({
   selector: 'app-region-map',
   imports: [MapSpots],
   templateUrl: './region-map.html',
   styleUrl: './region-map.scss',
-  // The backdrop tuner's numbers the styles read, as custom properties (the canvases read the rest themselves)
+  // The backdrop's numbers the styles read, as custom properties (the canvases read the rest themselves)
   host: {
-    '[style.--satellite-filter]': 'backdrop.filter()',
-    '[style.--satellite-opacity]': 'backdrop.style().opacity',
-    '[style.--outside-veil]': 'backdrop.style().outside'
+    '[style.--satellite-filter]': 'backdropFilter',
+    '[style.--satellite-opacity]': 'backdrop.opacity',
+    '[style.--outside-veil]': 'backdrop.outside',
+    '[style.--plain-halo]': 'plainColours.halo'
   }
 })
 export class RegionMap {
   readonly label = input("Map of the lands of today's Romania");
-  readonly geography = input<BaseGeography | null>(null); // lesson 01: sea, land, borders and rivers; null while loading
-  readonly satellite = input(true); // lesson 02: the Blue Marble picture under the lines
-  readonly plain = input(false); // lesson 06: a stylized map without the picture: blue water, paper land, no rivers
-  readonly territories = input<Territory[]>([]); // lesson 05: shapes over the land, under the lines
-  readonly focus = input<GeoPermissibleObjects | null>(null); // lesson 05: the land to keep bright; everything outside it is veiled
-  readonly softFocus = input(false); // lesson 06: the focus is a soft zone: the veil's edge is blurred like the zone's, not cut sharp
-  readonly arrows = input<MapArrow[]>([]); // lesson 06: movement across the map
-  readonly arrowYear = input<number | null>(null); // lesson 07: the arrows as at this year, instead of looping
-  readonly nameAt = input<Record<string, [number, number]>>({}); // lesson 07: names placed by hand, by id, in [lon, lat]
-  readonly nameText = input<Record<string, string>>({}); // lesson 08: names written by hand, by id, their lines split at \n
-  readonly places = input<MapPlace[]>([]); // lesson 06: dots with names
-  readonly spots = input<Spot[]>([]); // lesson 08: curiosities to click, a picture and a few sentences each
-  readonly coveredRight = input(0); // lesson 08: px along the right edge under the parent's own panel, kept clear of spot cards
-  readonly view = input<Extent | null>(null); // lesson 06: a box to fit instead of the core (a moment zoomed out)
+  readonly geography = input<BaseGeography | null>(null); // Sea, land, borders and rivers; null while loading
+  readonly satellite = input(true); // The Blue Marble picture under the lines
+  readonly plain = input(false); // A stylized map without the picture: blue water, paper land, no rivers
+  readonly territories = input<Territory[]>([]); // Shapes over the land, under the lines
+  readonly focus = input<GeoPermissibleObjects | null>(null); // The land to keep bright; everything outside it is veiled
+  readonly softFocus = input(false); // The focus is a soft zone: the veil's edge is blurred like the zone's, not cut sharp
+  readonly arrows = input<MapArrow[]>([]); // Movement across the map
+  readonly arrowYear = input<number | null>(null); // the arrows as at this year; null: all drawn in full
+  readonly arrowOnly = input<number | null>(null); // one arrow, by index, on its own (the others hidden), at arrowYear
+  readonly nameAt = input<Record<string, [number, number]>>({}); // Names placed by hand, by id, in [lon, lat]
+  readonly nameText = input<Record<string, string>>({}); // Names written by hand, by id, their lines split at \n
+  readonly places = input<MapPlace[]>([]); // Dots with names
+  readonly spots = input<Spot[]>([]); // Curiosities to click, a picture and a few sentences each
+  readonly coveredRight = input(0); // Px along the right edge under the parent's own panel, kept clear of spot cards
+  readonly view = input<Extent | null>(null); // A box to fit instead of the core (a moment zoomed out)
 
-  protected readonly backdrop = inject(Backdrop);
+  protected readonly backdrop = BACKDROP;
+  protected readonly backdropFilter = BACKDROP_FILTER;
+  // The plain map's colours (2007)
+  protected readonly plainColours = PLAIN_COLOURS;
 
   // The start of every id this map gives its drawings (the blur filters, the hatches, the arrows' masks): unique in the
-  // document, in case a lesson page ever shows a second map
+  // document, in case a page ever shows a second map
   protected readonly idPrefix = `region-map-${++maps}`;
 
   // The host's size in CSS pixels, from a ResizeObserver. A signal, so a resize re-runs the computeds below (zoneless:
@@ -146,40 +101,17 @@ export class RegionMap {
     observer.observe(inject(ElementRef<HTMLElement>).nativeElement);
     inject(DestroyRef).onDestroy(() => { observer.disconnect(); cancelAnimationFrame(this.frameId); this.endMotion(); });
 
-    // Lesson 08: the detailed picture first; the wide one after it, unless the browser asks to save data (then only once
+    // The detailed picture first; the wide one after it, unless the browser asks to save data (then only once
     // a view needs it: widePicture())
     this.picture(1).then(() => { if (!saveData()) this.widePicture(); });
     effect(() => { if (this.satellite() && needsWide(this.view())) untracked(() => this.widePicture()); });
 
-    // Lesson 08: the background repainted whenever what it is drawn from changes (during a zoom every frame is painted)
-    effect(() => { this.layers(); this.pictures(); this.backdrop.style(); this.size(); this.request(); });
+    // The background repainted whenever what it is drawn from changes (during a zoom every frame is painted)
+    effect(() => { this.layers(); this.pictures(); this.size(); this.request(); });
 
-    // Lesson 06: the arrows drawn on in turn, looping (after the render, once their masks and names are in the page). Not
-    // for a visitor who asked for less motion: they see them all at once.
-    afterRenderEffect(() => {
-      const n = this.arrowPaths().length, svg = this.mapSvg()?.nativeElement;
-      this.arrowAnimations.forEach(a => a.cancel());
-      this.arrowAnimations = [];
-      if (!n || !svg || reducedMotion() || this.arrowsAt()) return;
-      const cycle = (n - 1) * ARROW_STEP + ARROW_GROW + ARROW_LINGER + ARROW_FADE + ARROW_PAUSE, at = (s: number) => Math.min(1, s / cycle);
-      const timing = { duration: cycle * 1000, iterations: Infinity };
-      const [reveals, arrows, labels, years] = ['.arrow-reveal', 'path.arrow', '.arrow-label', '.arrow-year'].map(s => [...svg.querySelectorAll<SVGElement>(s)]);
-      for (let i = 0; i < n; i++) {
-        const start = i * ARROW_STEP, drawn = start + ARROW_GROW, end = drawn + ARROW_LINGER;
-        // The caption at the top: from its arrow's start until the next one's (the last, until it has faded)
-        const until = i < n - 1 ? start + ARROW_STEP : end + ARROW_FADE, swap = 0.4;
-        this.arrowAnimations.push(
-          years[i].animate([{ offset: 0, opacity: 0 }, { offset: at(start), opacity: 0 }, { offset: at(start + swap), opacity: 1 }, { offset: at(until - swap), opacity: 1 }, { offset: at(until), opacity: 0 }, { offset: 1, opacity: 0 }], timing),
-          reveals[i].animate([{ offset: 0, strokeDashoffset: 1 }, { offset: at(start), strokeDashoffset: 1, easing: 'ease-in-out' }, { offset: at(drawn), strokeDashoffset: 0 }, { offset: 1, strokeDashoffset: 0 }], timing),
-          arrows[i].animate([{ offset: 0, opacity: 1 }, { offset: at(end), opacity: 1 }, { offset: at(end + ARROW_FADE), opacity: 0 }, { offset: 1, opacity: 0 }], timing),
-          labels[i].animate([{ offset: 0, opacity: 0 }, { offset: at(start + ARROW_GROW / 2), opacity: 0 }, { offset: at(drawn), opacity: 1 }, { offset: at(end), opacity: 1 }, { offset: at(end + ARROW_FADE), opacity: 0 }, { offset: 1, opacity: 0 }], timing)
-        );
-      }
-    });
-
-    // Lesson 06: when the view changes, zoom from the old one to the new: once the new view is in the page (after the
+    // When the view changes, zoom from the old one to the new: once the new view is in the page (after the
     // render, still before the browser paints), so the zoom fades in the new drawings, not the old ones
-    // Lesson 08: and when the drawings were held for another moment with the same view, fade from them to the new
+    // And when the drawings were held for another moment with the same view, fade from them to the new
     afterRenderEffect(() => {
       const camera = this.camera(), scene = this.scene(), { width, height } = this.size(), key = JSON.stringify(this.view());
       this.heldVersion();
@@ -189,14 +121,14 @@ export class RegionMap {
 
   // --- The camera ------------------------------------------------------------------------------------------------------
 
-  // Lesson 08: the view's camera over the plane: its projection is the plane's scaled by k and moved by x, y
+  // The view's camera over the plane: its projection is the plane's scaled by k and moved by x, y
   private readonly camera = computed<Camera>(() => {
     const p = this.projection(), k = p.scale() / PLANE.scale(), [tx, ty] = p.translate(), [px, py] = PLANE.translate();
     return { k, x: tx - k * px, y: ty - k * py };
   });
   private readonly scene = computed<Scene>(() => ({ look: this.plain() ? 'plain' : this.satellite() ? 'satellite' : 'paper', units: needsWide(this.view()) ? 0 : 1 }));
 
-  // Lesson 06–08: zooming between two views. The background is repainted every frame by the camera eased from the old
+  // Zooming between two views. The background is repainted every frame by the camera eased from the old
   // view to the new. The moment's drawings (the two <svg>s over it) stay out of the way: the old ones fade out as the
   // camera starts, the new ones, drawn once for the new view, fade in as it lands, so in between only the background
   // moves, sharp at every step. While either shows, its <svg> is moved each frame to where that camera puts it: a
@@ -224,9 +156,8 @@ export class RegionMap {
   private held: { at: Camera; layers: HeldLayer[] } | null = null;
   private readonly heldVersion = signal(0); // counts the holds, so a hold with no change of view still moves (fades)
   private frameId = 0;
-  private arrowAnimations: Animation[] = [];
 
-  // Lesson 06: called by the parent just before it changes the moment: a copy of what is drawn now, to fade out as the zoom
+  // Called by the parent just before it changes the moment: a copy of what is drawn now, to fade out as the zoom
   // starts, or, with the same view, before the new drawings fade in (the background cross-fades itself, on the
   // canvases). With its own patterns, filters and masks, renamed, as the next moment may not have them; from wherever
   // its fade has got to, if a move is still under way.
@@ -313,7 +244,7 @@ export class RegionMap {
 
   // --- The background ----------------------------------------------------------------------------------------------
 
-  // Lesson 08: the background's layers as canvas paths on the plane, made once when the geography arrives
+  // The background's layers as canvas paths on the plane, made once when the geography arrives
   private readonly layers = computed(() => {
     const g = this.geography();
     if (!g || typeof Path2D === 'undefined') return null;
@@ -322,7 +253,7 @@ export class RegionMap {
     return { sea: trace(g.sea), land: trace(g.land), units: trace(g.unitBorders), countries: trace(g.countryBorders), coast: trace(g.coastline), rivers: rivers(false), danube: rivers(true) };
   });
 
-  // Lesson 08: the satellite pictures, feathered, once each has loaded (by address)
+  // The satellite pictures, feathered, once each has loaded (by address)
   private readonly pictures = signal<Record<string, HTMLCanvasElement>>({});
   private picture(i: number) {
     const p = PICTURES[i];
@@ -334,7 +265,7 @@ export class RegionMap {
   private scratch?: HTMLCanvasElement;
   private tokens?: ReturnType<typeof readTokens>;
 
-  // Three canvases: the pictures (under the CSS filter the tuner sets), the land and the sea, and, over the moment's
+  // Three canvases: the pictures (under the backdrop's CSS filter), the land and the sea, and, over the moment's
   // fills, the lines. Between two looks (a zoom to the plain map) each canvas cross-fades from the old to the new.
   private paint(camera: Camera, was: Scene, now: Scene, p: number) {
     const picture = this.pictureCanvas()?.nativeElement, base = this.baseCanvas()?.nativeElement, lines = this.linesCanvas()?.nativeElement;
@@ -343,7 +274,8 @@ export class RegionMap {
     const w = Math.round(width * dpr), h = Math.round(height * dpr);
     const at: Transform = [dpr * camera.k, 0, 0, dpr * camera.k, dpr * camera.x, dpr * camera.y];
     const scenes: [Scene, number][] = was.look === now.look ? [[now, 1]] : [[was, 1 - p], [now, p]];
-    const units = was.units + (now.units - was.units) * p, style = this.backdrop.style(), tokens = this.tokens ??= readTokens(base);
+    const units = was.units + (now.units - was.units) * p, style = this.backdrop, tokens = this.tokens ??= readTokens(base);
+    const plain = this.plainColours;
 
     const pc = clear(picture, w, h), satellite = scenes.reduce((sum, [s, weight]) => sum + (s.look === 'satellite' ? weight : 0), 0);
     if (satellite > 0) {
@@ -357,8 +289,8 @@ export class RegionMap {
     const bc = clear(base, w, h), lc = clear(lines, w, h), layers = this.layers();
     if (!layers) return;
     for (const [scene, weight] of scenes) {
-      this.blend(bc, weight, ctx => drawBase(ctx, scene.look, layers, at, tokens, style, w, h));
-      this.blend(lc, weight, ctx => drawLines(ctx, scene.look, layers, at, camera.k, tokens, style, units));
+      this.blend(bc, weight, ctx => drawBase(ctx, scene.look, layers, at, tokens, style, plain, w, h));
+      this.blend(lc, weight, ctx => drawLines(ctx, scene.look, layers, at, camera.k, tokens, style, plain, units));
     }
   }
 
@@ -385,8 +317,7 @@ export class RegionMap {
 
   // Lambert conformal conic: true scale along 44° and 48° N (they bracket Romania, 43.6°–48.3° N), centred on 25° E so
   // that meridian stands upright. Conformal: angles and small shapes are kept, so the Carpathian arc bends as it should.
-  // Between 42° and 50° N areas are off by under 0.4% (lesson 00), so territories can still be compared by size.
-  // Public: the trace tool (lesson 04) draws over the map in the same projection
+  // Between 42° and 50° N areas are off by under 0.4%, so territories can still be compared by size.
   readonly projection = computed(() => {
     const { width, height } = this.size();
     const view = this.view();
@@ -394,18 +325,18 @@ export class RegionMap {
   });
   private readonly path = computed(() => geoPath(this.projection()));
 
-  // Lesson 02: where the satellite picture goes, and lesson 04's unit for placing a reference map (public).
-  // scripts/build-satellite.mjs drew it in this same projection, fitted to the area's bounding box; here the projection is
-  // only scaled and moved to fit the window, so placing the picture over the area's bounding box lines it up exactly.
-  readonly frameBox = computed(() => {
-    const [[x0, y0], [x1, y1]] = this.path().bounds(frame);
-    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
-  });
-
   // Fills over the land and under every line; outlines over everything, so a state's border reads above rivers and coasts
-  // Lesson 06: soft zones, under the provinces' fills; blurred by an SVG filter (the template), so the edge fades out
+  // Soft zones, under the provinces' fills; blurred by an SVG filter (the template), so the edge fades out
   // `light`: a lighter fade (a neighbour, often small: the strong one would leave little of it)
   protected readonly zones = computed(() => this.ofKind('zone').map(t => ({ id: t.id, colour: t.colour, light: !!t.light, d: this.draw(t.geometry) })));
+  // The zones with a pattern (data/zone-fills.ts): the tile at its own size times its scale, recoloured, and the mask it
+  // shows through, the zone's own shape blurred like its colour, each with this map's own ids; the mask's box the whole
+  // drawing, so the blur is never cut off
+  protected readonly patterned = computed(() => this.zones().flatMap(z => {
+    const fill = ZONE_FILLS[z.id];
+    return fill ? [{ ...z, ...tile(fill), pattern: `${this.idPrefix}-pattern-${z.id}`, mask: `${this.idPrefix}-pattern-mask-${z.id}` }] : [];
+  }));
+  protected readonly maskBox = computed(() => { const [x, y, width, height] = this.viewBox().split(' ').map(Number); return { x, y, width, height }; });
   protected readonly fills = computed(() => this.ofKind('province').map(t => ({ id: t.id, colour: t.colour, d: this.draw(t.geometry) })));
   protected readonly outlines = computed(() => this.ofKind('outline').map(t => ({ id: t.id, colour: t.colour, d: this.draw(t.geometry) })));
 
@@ -423,7 +354,7 @@ export class RegionMap {
   // Names for the filled territories that have one: on the largest part (a small island or a sliver never gets the label),
   // at its centroid; sized by that part's area, 12–24px. A long name goes on two lines. The colour is the territory's,
   // darkened by a third so a pale yellow still reads; a white halo (paint-order) keeps it off the picture behind.
-  // Lesson 06: the lands a moment takes away, each a dotted edge and, at its centre, its name and who took it
+  // The lands a moment takes away, each a dotted edge and, at its centre, its name and who took it
   protected readonly lost = computed(() => this.ofKind('lost').map(t => {
     const path = this.path(), at = this.nameAt()[t.id], [x, y] = (at && this.projection()(at)) ?? path.centroid(largestPart(t.geometry, path));
     return { id: t.id, d: this.draw(t.geometry), lines: this.lines(t.id, t.label, false), note: t.note, x, y };
@@ -436,12 +367,9 @@ export class RegionMap {
     return { id: t.id, x, y, size, lines: this.lines(t.id, t.label!), colour: t.colour ? darken(t.colour, 0.35) : undefined };
   }));
 
-  // Lesson 08: an empire's name as big as the biggest land's name beside it (Roman Dacia's, in 101), so the two read as
+  // An empire's name as big as the biggest land's name beside it (Roman Dacia's, in 101), so the two read as
   // equals; 15px when it has none
   protected readonly empireSize = computed(() => Math.max(15, ...this.labels().map(l => l.size)));
-
-  // Lesson 08: every name on the map, where it is drawn and as written: the name editor's handles (public)
-  readonly names = computed(() => [...this.labels(), ...this.empires(), ...this.lost()].map(n => ({ id: n.id, text: n.lines.join('\n'), x: n.x, y: n.y })));
 
   // A name's lines: as written by hand (split at its line breaks), or its land's name, long ones in two (`split`)
   private lines(id: string, name: string, split = true) {
@@ -459,19 +387,19 @@ export class RegionMap {
     return `M${-m * w} ${-m * h}H${(m + 1) * w}V${(m + 1) * h}H${-m * w}Z${this.draw(focus)}`;
   });
 
-  // Lesson 08: the spots, projected
+  // The spots, projected
   protected readonly spotPoints = computed(() => this.spots().map(s => {
     const [x, y] = this.projection()(s.at) ?? [0, 0];
     return { ...s, x, y };
   }));
 
-  // Lesson 06: the places, projected
+  // The places, projected
   protected readonly placePoints = computed(() => this.places().map(p => {
     const [x, y] = this.projection()(p.at) ?? [0, 0];
     return { id: p.id, name: p.name, x, y };
   }));
 
-  // Lesson 06: the arrows, each one filled shape like a children's atlas draws them: a smooth curve through the waypoints
+  // The arrows, each one filled shape like a children's atlas draws them: a smooth curve through the waypoints
   // (Catmull–Rom, on screen), thin at the start and widening towards a big head at the end, so it reads as going one way
   protected readonly arrowPaths = computed(() => this.arrows().map(a => {
     const project = this.projection();
@@ -481,17 +409,10 @@ export class RegionMap {
     return { id: a.id, name: a.name, when: a.when, years: a.years, d: arrowShape(line), line: 'M' + line.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('L'), x: at[0], y: at[1] - 16 };
   }));
 
-  // Lesson 07: the arrows as at the time scale's year: how much of each is drawn, how strongly it shows, and which one
-  // the caption at the top names (the latest still under way). Null: no year, the arrows loop instead.
+  // The arrows as at the play slider's year (arrowsAtYear, above). Null: no year, every arrow drawn in full.
   protected readonly arrowsAt = computed(() => {
     const year = this.arrowYear(), arrows = this.arrowPaths();
-    if (year === null || !arrows.length || reducedMotion()) return null;
-    const states = arrows.map(a => {
-      const [from, to] = a.years ?? [0, 0], drawn = Math.max(0, Math.min(1, (year - from) / Math.max(DRAW_YEARS, to - from)));
-      const past = Math.max(0, Math.min(1, (year - to - LINGER_YEARS) / FADE_YEARS));
-      return { drawn, opacity: 1 - past * (1 - PAST), current: drawn > 0 && year <= to + LINGER_YEARS };
-    });
-    return { states, caption: states.reduce((last, s, i) => s.current ? i : last, -1) };
+    return year === null || !arrows.length ? null : arrowsAtYear(arrows, year, this.arrowOnly());
   });
 
   // The territories of one kind, typed as that kind
@@ -501,194 +422,13 @@ export class RegionMap {
 
 }
 
-// --- Painting the background (lesson 08) -------------------------------------------------------------------------------
 
-type Transform = [number, number, number, number, number, number];
-type Layers = { sea: Path2D; land: Path2D; units: Path2D; countries: Path2D; coast: Path2D; rivers: Path2D; danube: Path2D };
-
-// The colours the styles share, read once from the page's custom properties
-function readTokens(el: Element) {
-  const css = getComputedStyle(el), v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-  return { ink: v('--ink', '#141414'), river: v('--river', '#1b3a73'), muted: v('--muted', '#6b6862'), tint: v('--tint', '#f2f1ed'), surface: v('--surface', '#ffffff'), water: v('--water', '#d6e8f6') };
-}
-type Tokens = ReturnType<typeof readTokens>;
-
-// A canvas at the window's size in device pixels, cleared
-function clear(canvas: HTMLCanvasElement, w: number, h: number) {
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  return ctx;
-}
-
-// Lesson 01–02, 06: the land and the sea. Over the satellite picture only a light white veil on the land, so the history
-// colours stay readable; on paper the land white and the sea a faint tint; on the plain map all the water blue (behind
-// the land too: the Black Sea is the only sea the data has as a shape) and the land paper
-function drawBase(ctx: CanvasRenderingContext2D, look: Look, layers: Layers, at: Transform, tokens: Tokens, style: BackdropStyle, w: number, h: number) {
-  if (look === 'plain') { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = tokens.water; ctx.fillRect(0, 0, w, h); }
-  ctx.setTransform(...at);
-  if (look === 'paper') { ctx.fillStyle = tokens.tint; ctx.fill(layers.sea); }
-  ctx.fillStyle = look === 'plain' ? '#fbf8f1' : look === 'paper' ? tokens.surface : white(style.veil);
-  ctx.fill(layers.land);
-}
-
-// Lesson 01–02, 06: the lines, from thinnest to heaviest, so a river or a country border is never hidden under a county
-// line; their widths in screen pixels, the same at every zoom. Weight says what a line is: county hairlines, rivers bold
-// and dark blue (the one colour water gets), the Danube heavier still, country borders the atlas dash-dot, so where one
-// runs along a river (the Prut, the Danube) the two still read apart. Over the satellite picture the lines get pale
-// halos (ink and dark blue alone would sink into the forest green); on the plain map no rivers, the borders thin grey.
-function drawLines(ctx: CanvasRenderingContext2D, look: Look, layers: Layers, at: Transform, k: number, tokens: Tokens, style: BackdropStyle, units: number) {
-  ctx.setTransform(...at);
-  ctx.lineJoin = 'round';
-  const line = (path: Path2D, colour: string, width: number, dash?: number[]) => {
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = width / k;
-    ctx.lineCap = dash ? 'butt' : 'round';
-    ctx.setLineDash(dash ? dash.map(d => d / k) : []);
-    ctx.stroke(path);
-  };
-  const satellite = look === 'satellite', plain = look === 'plain';
-  if (units > 0) {
-    ctx.globalAlpha = units;
-    line(layers.units, satellite ? white(style.counties) : tokens.muted, satellite ? 0.5 : 0.4);
-    ctx.globalAlpha = 1;
-  }
-  if (!plain) {
-    if (satellite) { line(layers.rivers, white(style.halo), 4); line(layers.danube, white(style.halo), 5.6); }
-    line(layers.rivers, tokens.river, 2);
-    line(layers.danube, tokens.river, 3.2);
-  }
-  line(layers.countries, plain ? '#7d8590' : tokens.ink, plain ? 0.8 : satellite ? 1.6 : 1.2, plain ? undefined : [7, 2.5, 1.5, 2.5]);
-  line(layers.coast, plain ? '#5b7a99' : satellite ? white(style.coast) : tokens.ink, plain ? 0.8 : 1);
-}
-
-function white(alpha: number) { return `rgb(255 255 255 / ${alpha})`; }
-
-// Lesson 08: a satellite picture with its edge feathered: kept only inside its extent shrunk by `inset` degrees,
-// blurred over as many again, so it fades out by its own edge. The blur is a shadow's (canvas filters aren't in every
-// browser): the shrunk extent is filled far off the canvas, and only its blurred shadow, moved back, lands on it. Once
-// per address, for every map.
-const featheredPictures = new Map<string, Promise<HTMLCanvasElement | null>>();
-function feathered(p: Picture) {
-  if (!featheredPictures.has(p.src)) featheredPictures.set(p.src, (async () => {
-    const image = new Image();
-    image.src = p.src;
-    await image.decode();
-    const w = image.naturalWidth, h = image.naturalHeight, sx = w / p.box.width, sy = h / p.box.height;
-    const perDegree = Math.abs(PLANE([25, 45])![1] - PLANE([25, 46])![1]) * sy, blur = p.inset * perDegree, off = w + 4 * blur;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
-    const [[x0, y0], [x1, y1]] = p.extent, i = p.inset;
-    ctx.setTransform(sx, 0, 0, sy, off - p.box.x * sx, -p.box.y * sy);
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = blur;
-    ctx.shadowOffsetX = -off;
-    ctx.beginPath();
-    geoPath(PLANE, ctx)(outline([[x0 + i, y0 + i], [x1 - i, y1 - i]]));
-    ctx.fill();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.shadowColor = 'transparent';
-    ctx.globalCompositeOperation = 'source-in';
-    ctx.drawImage(image, 0, 0);
-    return canvas;
-  })().catch(() => null));
-  return featheredPictures.get(p.src)!;
-}
-
-// A drawing layer's transform: what was drawn for camera `at`, moved to where `camera` puts it
-function relative(camera: Camera, at: Camera) {
-  const r = camera.k / at.k;
-  return `matrix(${r}, 0, 0, ${r}, ${camera.x - r * at.x}, ${camera.y - r * at.y})`;
-}
-
-// A drawing layer's content, as markup: its <defs> and each drawing apart (its markup is also how it is told from the
-// next moment's: the same markup, the same drawing), and the ids in it, to rename in the copy (renamed()). The arrows,
-// their names and captions are drawn on by Web Animations, which markup doesn't keep: their state now (how much of each
-// is drawn, how strongly it shows) is written on them for the copy, then taken off again, so the copy doesn't flash
-// every arrow at once.
-type HeldLayer = { classes: string; opacity: number; defs: string; pieces: string[]; ids: string[] };
-function heldLayer(svg: SVGSVGElement): HeldLayer {
-  const animated = [...svg.querySelectorAll<SVGElement>('.arrow-reveal, path.arrow, .arrow-label, .arrow-year')];
-  const styles = animated.map(e => e.getAttribute('style'));
-  for (const e of animated) {
-    const css = getComputedStyle(e);
-    e.style.opacity = css.opacity;
-    if (e.classList.contains('arrow-reveal')) e.style.strokeDashoffset = css.strokeDashoffset;
-  }
-  const children = [...svg.children];
-  const layer = {
-    classes: svg.getAttribute('class') ?? '', opacity: Number(getComputedStyle(svg).opacity),
-    defs: children.filter(e => e.tagName === 'defs').map(e => e.outerHTML).join(''),
-    pieces: pieces(svg), ids: [...svg.querySelectorAll('[id]')].map(e => e.id)
-  };
-  animated.forEach((e, i) => styles[i] === null ? e.removeAttribute('style') : e.setAttribute('style', styles[i]!));
-  return layer;
-}
-// A layer's drawings, each as its markup (not its <defs>)
-function pieces(svg: SVGSVGElement) { return [...svg.children].filter(e => e.tagName !== 'defs').map(e => e.outerHTML); }
-
-// Markup with every id (and every url(#id) or #id pointing at one) renamed, so the copy keeps its own patterns, filters
-// and masks beside the new drawings'
-function renamed(html: string, ids: string[]) {
-  for (const id of ids) html = html.replace(new RegExp(`(id="|#)${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=["')&])`, 'g'), `$1${id}-held`);
-  return html;
-}
-
-// The zoom's easing, and the camera that far from one view to the next. In and out, sine: gentler than a cubic, whose
-// long slow end (its last fifth of the time for 3% of the way) made the zoom seem to drag as it landed
-function ease(t: number) { return (1 - Math.cos(Math.PI * t)) / 2; }
-function between(a: Camera, b: Camera, e: number): Camera {
-  const k = a.k ** (1 - e) * b.k ** e, f = Math.abs(b.k - a.k) < 1e-9 * b.k ? e : (k - a.k) / (b.k - a.k);
-  return { k, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
-}
 
 // A browser asking to save data (it gets the wide picture only once a view needs it)
 function saveData() { return !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData; }
 
 let maps = 0;
 
-// Lesson 06: the arrow's shape. Its half-width grows from TAIL to BODY along the line; the head, HEAD long and
-// HEAD_WIDTH across each side, ends at the last point. In pixels, the same at every view.
-const TAIL = 4, BODY = 13, HEAD = 42, HEAD_WIDTH = 28;
-
-// A smooth line through the points (uniform Catmull–Rom, 12 samples per stretch), as screen points
-function smoothLine(points: [number, number][]) {
-  const at = (i: number) => points[Math.max(0, Math.min(points.length - 1, i))];
-  const line: [number, number][] = [points[0]];
-  for (let i = 0; i < points.length - 1; i++) {
-    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
-    for (let s = 1; s <= 12; s++) {
-      const t = s / 12, t2 = t * t, t3 = t2 * t;
-      const f = (k: 0 | 1) => 0.5 * (2 * p1[k] + (p2[k] - p0[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (3 * p1[k] - p0[k] - 3 * p2[k] + p3[k]) * t3);
-      line.push([f(0), f(1)]);
-    }
-  }
-  return line;
-}
-
-// The outline round a line: up its left side, round the head, back down its right side
-function arrowShape(line: [number, number][]) {
-  const lengths = [0];
-  for (let i = 1; i < line.length; i++) lengths.push(lengths[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-  const total = lengths[lengths.length - 1] || 1, bodyEnd = total - Math.min(HEAD, total * 0.35);
-  const unit = (a: number[], b: number[]) => { const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / len, (b[1] - a[1]) / len]; };
-  const left: number[][] = [], right: number[][] = [];
-  let last = 0;
-  for (let i = 0; i < line.length && lengths[i] <= bodyEnd; i++) {
-    const [ux, uy] = unit(line[Math.max(0, i - 1)], line[Math.min(line.length - 1, i + 1)]), w = TAIL + (BODY - TAIL) * (lengths[i] / bodyEnd);
-    left.push([line[i][0] - uy * w, line[i][1] + ux * w]);
-    right.push([line[i][0] + uy * w, line[i][1] - ux * w]);
-    last = i;
-  }
-  const base = line[last], tip = line[line.length - 1], [ux, uy] = unit(base, tip);
-  const wing = (side: 1 | -1) => [base[0] - uy * HEAD_WIDTH * side, base[1] + ux * HEAD_WIDTH * side];
-  const round = (p: number[]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
-  return 'M' + [...left, wing(1), tip, wing(-1), ...right.reverse()].map(round).join('L') + 'Z';
-}
 
 // A visitor who has asked for less motion gets the new view at once
 function reducedMotion() { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; }
@@ -709,6 +449,14 @@ function largestPart(o: GeoPermissibleObjects, path: GeoPath): GeoPermissibleObj
 }
 
 // A #rrggbb colour mixed with black (darken) or white (lighten) by `amount` (0–1)
+// A zone's pattern tile on screen: its own size times the fill's scale, and its drawing in the fill's colour, as a picture
+// (an <image> inside the <pattern>: as a mask it would not draw)
+function tile(fill: ZoneFill) {
+  const { w, h, svg } = TILES[fill.name];
+  const file = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${svg.replaceAll('currentColor', fill.color)}</svg>`;
+  return { fill, w: w * fill.scale, h: h * fill.scale, href: 'data:image/svg+xml,' + encodeURIComponent(file) };
+}
+
 function darken(hex: string, amount: number) { return mix(hex, 0, amount); }
 function lighten(hex: string, amount: number) { return mix(hex, 255, amount); }
 function mix(hex: string, to: number, amount: number) {

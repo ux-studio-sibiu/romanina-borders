@@ -1,16 +1,16 @@
 <figure class="nsc-region-map">
   <!-- Nothing to draw until the ResizeObserver has measured the host -->
   @if (size().width) {
-    <!-- Lesson 08: the background, one plane for every moment, painted by the camera (region-map.ts): the satellite
+    <!-- The background, one plane for every moment, painted by the camera (region-map.ts): the satellite
          pictures, then the land and the sea. (No graticule: the projection's curved grid showed at the picture's edges
-         while zooming, so lesson 06 took it out.) -->
+         while zooming, so it was taken out.) -->
     <canvas #picture class="picture" aria-hidden="true"></canvas>
     <canvas #base class="base" aria-hidden="true"></canvas>
 
     <!-- The moment's fills, over the land and under the lines -->
     <svg #fillsSvg class="fills" [attr.viewBox]="viewBox()" aria-hidden="true" [class.is-plain]="plain()">
       <defs>
-        <!-- Lesson 06: the soft zones' fuzzy edge: the zone shrunk first (erode), then blurred wide, so the colour fades in
+        <!-- The soft zones' fuzzy edge: the zone shrunk first (erode), then blurred wide, so the colour fades in
              over a broad band inside its edge; the filters' boxes are grown so the blur isn't cut off. -->
         <filter [attr.id]="idPrefix + '-soft'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="16" /><feGaussianBlur stdDeviation="26" />
@@ -18,7 +18,7 @@
         <filter [attr.id]="idPrefix + '-soft-light'" x="-20%" y="-20%" width="140%" height="140%">
           <feMorphology operator="erode" radius="4" /><feGaussianBlur stdDeviation="9" />
         </filter>
-        <!-- Lesson 05: each empire's hatch: a tint of its colour and a light diagonal line every 7px, light so it shows over
+        <!-- Each empire's hatch: a tint of its colour and a light diagonal line every 7px, light so it shows over
              the dark satellite picture -->
         @for (e of empires(); track e.id) {
           <pattern [attr.id]="e.pattern" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
@@ -26,16 +26,28 @@
             <line x1="3.5" y1="0" x2="3.5" y2="7" [attr.stroke]="e.light" stroke-width="1.8" stroke-opacity="0.9" />
           </pattern>
         }
+        <!-- The soft zones' patterns (data/zone-fills.ts): each zone's tile, recoloured (region-map.ts), and its mask, its
+             shape blurred like its colour, so the pattern stays crisp inside and fades out at the edge -->
+        @let box = maskBox();
+        @for (z of patterned(); track z.id) {
+          <pattern [attr.id]="z.pattern" patternUnits="userSpaceOnUse" [attr.width]="z.w" [attr.height]="z.h" [attr.patternTransform]="'rotate(' + z.fill.rotate + ')'">
+            <image [attr.href]="z.href" [attr.width]="z.w" [attr.height]="z.h" preserveAspectRatio="none" />
+          </pattern>
+          <mask [attr.id]="z.mask" maskUnits="userSpaceOnUse" [attr.x]="box.x" [attr.y]="box.y" [attr.width]="box.width" [attr.height]="box.height">
+            <path [attr.d]="z.d" style="fill: #fff" [attr.filter]="'url(#' + idPrefix + (z.light ? '-soft-light)' : '-soft)')" />
+          </mask>
+        }
       </defs>
       @for (e of empires(); track e.id) { <path class="empire" [attr.d]="e.d" [style.fill]="'url(#' + e.pattern + ')'" /> }
       @for (z of zones(); track z.id) { <path class="zone" [class.is-light]="z.light" [attr.d]="z.d" [style.--territory]="z.colour" [attr.filter]="'url(#' + idPrefix + (z.light ? '-soft-light)' : '-soft)')" /> }
+      @for (z of patterned(); track z.id) { <path [attr.d]="z.d" [style.fill]="'url(#' + z.pattern + ')'" [attr.mask]="'url(#' + z.mask + ')'" [attr.opacity]="z.fill.opacity" /> }
       @for (t of fills(); track t.id) { <path class="territory" [attr.d]="t.d" [style.--territory]="t.colour" /> }
     </svg>
 
-    <!-- Lesson 08: the last moment's fills, fading out as a zoom starts (region-map.ts fills it) -->
+    <!-- The last moment's fills, fading out as a zoom starts (region-map.ts fills it) -->
     <svg #heldFills class="held" [attr.viewBox]="viewBox()" aria-hidden="true"></svg>
 
-    <!-- Lesson 08: the background's lines, over the fills -->
+    <!-- The background's lines, over the fills -->
     <canvas #lines class="lines" aria-hidden="true"></canvas>
 
     <svg #mapSvg [attr.viewBox]="viewBox()" role="img" [attr.aria-label]="label()" [class.is-plain]="plain()">
@@ -45,37 +57,32 @@
           <feMorphology operator="dilate" radius="16" /><feGaussianBlur stdDeviation="26" />
         </filter>
       </defs>
-      <!-- Lesson 05: everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
+      <!-- Everything outside the focus veiled, lines and hatching too; the empires' edges, the state's outline
            and every name stay above it -->
       @if (outside()) { <path class="outside" [attr.d]="outside()" fill-rule="evenodd" [attr.filter]="softFocus() ? 'url(#' + idPrefix + '-soft-veil)' : null" /> }
       <!-- A border drawn twice: a wide white line, then the black one on it, so it reads over any colour -->
       @for (e of empires(); track e.id) { <path class="empire-outline-halo" [attr.d]="e.d" /> }
       @for (e of empires(); track e.id) { <path class="empire-outline" [attr.d]="e.d" [style.stroke]="e.colour" /> }
-      <!-- Lesson 06: lands taken away, dotted, over the veil and under the state's border -->
+      <!-- Lands taken away, dotted, over the veil and under the state's border -->
       @for (l of lost(); track l.id) { <path class="lost-halo" [attr.d]="l.d" /><path class="lost-edge" [attr.d]="l.d" /> }
       @for (t of outlines(); track t.id) { <path class="territory-outline-halo" [attr.d]="t.d" /> }
       @for (t of outlines(); track t.id) { <path class="territory-outline" [attr.d]="t.d" [style.--territory]="t.colour" /> }
-      <!-- Lesson 06: arrows: one white shape each, outlined in black, revealed tail to head by a mask: a wide stroke along
-           its middle line, drawn on in turn (region-map.ts) -->
-      <!-- Lesson 07: or set by a year (the time scale's), arrowsAt -->
+      <!-- Arrows: one white shape each, outlined in black, revealed tail to head by a mask: a wide stroke along
+           its middle line, drawn on as the play slider's year goes by (arrowsAt) -->
       @let at = arrowsAt();
       @for (a of arrowPaths(); track a.id; let i = $index) {
         <mask [attr.id]="idPrefix + '-arrow-' + i"><path class="arrow-reveal" [attr.d]="a.line" pathLength="1" [style.stroke-dashoffset]="at ? 1 - at.states[i].drawn : null" /></mask>
         <path class="arrow" [attr.d]="a.d" [attr.mask]="'url(#' + idPrefix + '-arrow-' + i + ')'" [style.opacity]="at ? at.states[i].opacity : null" />
       }
 
-      <!-- Lesson 05: the territories' names, over every line -->
-      <!-- Lesson 06: places, a dot and a name beside it -->
+      <!-- The territories' names, over every line -->
+      <!-- Places, a dot and a name beside it -->
       @for (p of placePoints(); track p.id) {
         <circle class="place-dot" [attr.cx]="p.x" [attr.cy]="p.y" r="4" />
         <text class="place-label" [attr.x]="p.x + 7" [attr.y]="p.y">{{ p.name }}</text>
       }
       @for (a of arrowPaths(); track a.id; let i = $index) {
-        <text class="arrow-label" [attr.x]="a.x" [attr.y]="a.y" [style.opacity]="at ? (at.states[i].drawn > 0.5 ? at.states[i].opacity : 0) : null">{{ a.name }}@if (a.when) {<tspan class="when" [attr.x]="a.x" dy="15">{{ a.when }}</tspan>}</text>
-      }
-      <!-- Lesson 06: when each people came, large at the top of the map, one at a time with its arrow (region-map.ts) -->
-      @for (a of arrowPaths(); track a.id; let i = $index) {
-        <text class="arrow-year" [attr.x]="size().width / 2" y="58" [style.opacity]="at ? (i === at.caption ? 1 : 0) : null">{{ a.when ? a.when + ': ' : '' }}{{ a.name }}</text>
+        <text class="arrow-label" [attr.x]="a.x" [attr.y]="a.y" [style.opacity]="at ? (at.states[i].drawn > 0.5 ? at.states[i].opacity : 0) : null">{{ a.name }}</text>
       }
       @for (e of empires(); track e.id) {
         <text class="empire-label" [attr.x]="e.x" [attr.y]="e.y" [style.fill]="e.ink" [style.font-size.px]="empireSize()">
@@ -94,10 +101,10 @@
         </text>
       }
     </svg>
-    <!-- Lesson 08: and the rest of its drawings -->
+    <!-- And the rest of its drawings -->
     <svg #heldMap class="held" [attr.viewBox]="viewBox()" aria-hidden="true"></svg>
 
-    <!-- Lesson 08: the spots, markers to click for a picture and a few sentences -->
+    <!-- The spots, markers to click for a picture and a few sentences -->
     @if (spotPoints().length) { <app-map-spots [spots]="spotPoints()" [width]="size().width" [height]="size().height" [coveredRight]="coveredRight()" /> }
   }
 </figure>

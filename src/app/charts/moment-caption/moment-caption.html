@@ -1,0 +1,29 @@
+@let m = moment();
+<!-- The moment's people, on top of the panel: part of it, so they move with it -->
+@if (showCharacters() && characters().length) {
+  <ul class="characters" aria-label="People of this moment" [style.--count]="columns()">
+    @for (c of characters(); track c.id) { <li><app-avatar [size]="150" [src]="c.picture" [alt]="c.alt" [name]="c.name" /></li> }
+  </ul>
+}
+<div class="nsc-moment-caption" [class.is-closed]="!open()">
+  <div class="tools">
+    <!-- The moment's people, shown or hidden: a figure in a box, filled while they show -->
+    @if (characters().length) {
+      <button type="button" class="tool" [class.is-on]="showCharacters()" [attr.aria-pressed]="showCharacters()" [attr.aria-label]="showCharacters() ? 'Hide the people' : 'Show the people'"
+              [title]="showCharacters() ? 'Hide the people' : 'Show the people'" (click)="showCharactersChange.emit(!showCharacters())">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="3.6" r="2.2" /><path d="M1.8 11 C1.8 7.6 3.6 6.6 6 6.6 C8.4 6.6 10.2 7.6 10.2 11 Z" /></svg>
+      </button>
+    }
+    <!-- A minus in a box folds it to the title; a plus opens it again -->
+    <button type="button" class="tool" [attr.aria-expanded]="open()" [attr.aria-label]="open() ? 'Fold the details' : 'Open the details'" (click)="openChange.emit(!open())">
+      <svg class="line" viewBox="0 0 12 12" aria-hidden="true"><path [attr.d]="open() ? 'M2 6 H10' : 'M2 6 H10 M6 2 V10'" /></svg>
+    </button>
+  </div>
+  <p class="title">{{ m.label }}: {{ m.title }}</p>
+  @if (open()) {
+    <ul class="facts">
+      <li class="ago">{{ ago() }}</li>
+      @for (s of sentences(); track $index) { <li>@for (p of s; track $index) {@if (p.colour) {<app-pill [colour]="p.colour">{{ p.text }}</app-pill>} @else {<span>{{ p.text }}</span>}}</li> }
+    </ul>
+  }
+</div>

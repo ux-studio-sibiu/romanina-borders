@@ -1,0 +1,7 @@
+<div class="nsc-step-scrollbar" [class.is-dragging]="dragAt() !== null">
+  <div class="track" #track (pointerdown)="press($event)" (pointermove)="move($event)" (pointerup)="release()" (pointercancel)="release()">
+    <div class="thumb" role="slider" tabindex="0" aria-orientation="vertical" [attr.aria-label]="label()"
+         [attr.aria-valuemin]="0" [attr.aria-valuemax]="count() - 1" [attr.aria-valuenow]="index()" [attr.aria-valuetext]="labels()[index()]"
+         [style.height.%]="size() * 100" [style.top.%]="at() * (1 - size()) * 100" (keydown)="key($event)"></div>
+  </div>
+</div>

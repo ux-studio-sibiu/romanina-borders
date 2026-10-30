@@ -1,0 +1,13 @@
+<section class="nsc-intro-cover" aria-live="polite">
+  <!-- The title in two lines: its words, then its last word on its own, much larger ("A short history of" / "Romania") -->
+  <h2 class="title"><span class="lead">{{ titleLead() }}</span> <span class="key">{{ titleKey() }}</span></h2>
+  <p class="text">
+    <!-- Each sentence on a line of its own -->
+    @for (s of sentences(); track $index) {<span class="line">@for (p of s; track $index) {@if (p.colour) {<app-pill [colour]="p.colour">{{ p.text }}</app-pill>} @else {<span>{{ p.text }}</span>}}</span>}
+  </p>
+  @if (characters().length) {
+    <ul class="characters" aria-label="People you will meet" [style.--count]="characters().length">
+      @for (c of characters(); track c.id) { <li><app-avatar [size]="132" [showName]="false" [src]="c.picture" [alt]="c.alt" [name]="c.name" /></li> }
+    </ul>
+  }
+</section>
